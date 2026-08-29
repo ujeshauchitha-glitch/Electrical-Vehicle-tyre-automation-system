@@ -1,0 +1,22 @@
+{
+  "hashes": {
+    "legacy/ev_tyre_fusion.py": "950ef9d160632d806ad578a90068abfa73835929a52ae43929344b758b23331b",
+    "src/evtyre/config/__init__.py": "dce7f28b3357f9be24d9146f732c2542c0169fce1a95b6199cf501a173e96958",
+    "src/evtyre/config/tyre.py": "a5a8c365d30ff44a8263b79108432194058983477a7a9393bee854f6295bd838",
+    "src/evtyre/config/vehicle.py": "1720480f74e35dbeba6244161fdb7801c838c386bb9bd53e0e017b57c1aec032",
+    "src/evtyre/ingest/__init__.py": "4a9b440c67c9453e0ebea855c40711ca07f2d77545d21a9b187fab7e70bf23e9",
+    "src/evtyre/ingest/interface.py": "017b74c2ecb776da11365d39d22bab26328de0059d4ac5a4ebad765a9ed97ded",
+    "src/evtyre/ingest/normalize.py": "b8fb774166678322a9603df85852986539835d0c2708a624a372f24bebe4b457",
+    "src/evtyre/ingest/raw.py": "f0e7c9f663c3de8b778f49ffedd32510d875493198dc1cfed86ff2779fd8f03a",
+    "src/evtyre/ingest/units.py": "9206ead539479908131b535af76d4037224080e4a49825c9316a381dc27f9acf",
+    "src/evtyre/ingest/validation.py": "ed9b256bea0a79707229a5215547689a724fd185b731a18f995070d2a5fa50e1",
+    "src/evtyre/schema/__init__.py": "2e71e6ae9b970da8290121f3ccebf8e29daea95d7a1f08630cb68983cc400f5e",
+    "src/evtyre/schema/common.py": "20e4fc67f5e9616e99ca6292ff38a1bea555b5306fb69ca89c08c16b7f273e02",
+    "src/evtyre/schema/telemetry.py": "f2cda312cc1ab4f6b32508378e2bbe0909b3ba77c4b89dd38356ee2629ae6496"
+  },
+  "directories": {
+    "src/evtyre/schema": ["src/evtyre/schema/__init__.py", "src/evtyre/schema/common.py", "src/evtyre/schema/telemetry.py"],
+    "src/evtyre/config": ["src/evtyre/config/__init__.py", "src/evtyre/config/tyre.py", "src/evtyre/config/vehicle.py"],
+    "src/evtyre/ingest": ["src/evtyre/ingest/__init__.py", "src/evtyre/ingest/interface.py", "src/evtyre/ingest/normalize.py", "src/evtyre/ingest/raw.py", "src/evtyre/ingest/units.py", "src/evtyre/ingest/validation.py"]
+  }
+}
