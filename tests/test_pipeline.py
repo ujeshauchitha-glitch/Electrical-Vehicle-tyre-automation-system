@@ -16,7 +16,7 @@ def _make_vehicle() -> VehicleConfig:
 
 
 def _make_tyre() -> TyreConfig:
-    return TyreConfig("test", 0.322, 8.0, 1.6, 240.0)
+    return TyreConfig("test", 0.322, 8.0, 1.6, 240.0, 25.0)
 
 
 def _ok_per_corner(value: float) -> dict[str, SensorReading]:
@@ -107,8 +107,8 @@ class EndToEndTests(unittest.TestCase):
 
         features, result = pipe.run(_make_frame())
         self.assertTrue(len(features) > 0)
-        self.assertIsNotNone(result.state)
-        self.assertGreater(result.confidence, 0)
+        self.assertIsNotNone(result.states)
+        self.assertGreater(result.n_states_observed > 0, 0)
 
     def test_pipeline_without_resonance(self):
         """Pipeline should work fine without registering resonance."""

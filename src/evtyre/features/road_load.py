@@ -27,18 +27,14 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
 from ..config.tyre import TyreConfig
 from ..config.vehicle import VehicleConfig
-from ..schema.common import CORNERS, SensorReading, SensorStatus
+from ..schema.common import CORNERS
 from ..schema.telemetry import TelemetryFrame
 from .contract import Classification, Directionality, Feature, FeatureStatus
 
-if TYPE_CHECKING:
-    pass
-
-EXTRACTOR_VERSION = "0.1.0"
+EXTRACTOR_VERSION = "0.2.0"
 
 # Gravitational acceleration (SI).  This is a measured constant, not a guess.
 _G_MS2: float = 9.80665
@@ -127,20 +123,25 @@ def extract(
     # C_rr0 and exponents are UNVALIDATED guesses from legacy.
     _C_RR0 = 0.0090       # UNVALIDATED — legacy reference value
     _P_EXPONENT = 0.45    # UNVALIDATED — legacy reference value
-    _TREAD_RR_SPAN = 0.20 # UNVALIDATED — legacy reference value
     _T_COEFF = 0.0015     # UNVALIDATED — legacy reference value
     _T_REF = 25.0         # UNVALIDATED — reference temperature (°C)
 
+    # NOTE ON THE OMITTED TREAD TERM.
+    # Legacy's C_rr carries a tread factor  (1 - span) + span * (tread/tread_new).
+    # It is deliberately absent here: tread depth is not known at Phase 2 — it is
+    # a Phase 3 state, not a Phase 2 observable. Omitting the factor is equivalent
+    # to holding it at its tread_new value of 1.0.
+    # Do NOT reintroduce it as a constant expression: a previous revision wrote it
+    # as `(1.0 - _TREAD_RR_SPAN) + _TREAD_RR_SPAN`, which is identically 1.0 while
+    # looking like a computed term.
     available_c_rr = []
     for corner in CORNERS:
         p = pressures_kpa[corner]
         t = temps_c[corner]
         if p is not None and p > 0 and t is not None:
             p_term = (tyre_config.placard_pressure_kpa / p) ** _P_EXPONENT
-            # t_term uses tread_new as reference — worn tread = lower Crr
-            t_term = (1.0 - _TREAD_RR_SPAN) + _TREAD_RR_SPAN  # placeholder: tread unknown
             T_term = 1.0 + _T_COEFF * (t - _T_REF)
-            c_rr = _C_RR0 * p_term * t_term * T_term
+            c_rr = _C_RR0 * p_term * T_term
             available_c_rr.append(c_rr)
 
     if available_c_rr:
@@ -217,17 +218,30 @@ def extract(
         ))
 
     # --- Grade resistance force (N) ---
-    # F_grade = m * g * sin(grade)
-    # Defaults to 0 on flat road.
-    f_grade = vehicle_config.mass_kg * _G_MS2 * math.sin(grade_rad)
+    # F_grade = m * g * sin(grade).
+    #
+    # ALWAYS UNAVAILABLE. TelemetryFrame carries no incline, pitch or elevation
+    # channel (interface gap G6), so road grade is not measurable. The previous
+    # revision emitted m*g*sin(0) = 0.0 with status OK, which reports the
+    # flat-road ASSUMPTION as if it were a measurement.
+    #
+    # This is not the same category as the unvalidated aero constants: Cd and
+    # frontal area are fixed vehicle properties that can be measured once, while
+    # grade is a time-varying environmental state that changes continuously. On a
+    # 2% incline the grade term is ~363 N against ~160 N of rolling resistance —
+    # assuming it away silently would dominate everything downstream.
     features.append(Feature(
         name="grade_resistance_force_n",
-        value=f_grade,
+        value=None,
         unit="N",
-        status=FeatureStatus.OK,
-        unavailable_reason=None,
+        status=FeatureStatus.UNAVAILABLE,
+        unavailable_reason=(
+            "No incline/pitch/elevation channel in TelemetryFrame (interface "
+            "gap G6); road grade is not measurable, and a flat-road assumption "
+            "is not a measurement"
+        ),
         directionality=Directionality.NATURAL,
-        classification=Classification.C,
+        classification=Classification.D,
         inputs=(),
         corner=None,
         timestamp_s=ts,
@@ -270,60 +284,79 @@ def extract(
         ))
 
     # --- Total road load force (N) ---
-    # Sum of available components.  Missing components treated as 0 (their
-    # contribution is unknown, not zero — this is flagged via individual
-    # UNAVAILABLE features above).
-    f_roll_val = next(
-        (f.value for f in features if f.name == "rolling_resistance_force_n"
-         and f.status == FeatureStatus.OK), 0.0
+    # A sum is only as available as its least available term. Every component
+    # must be OK; a missing component makes the TOTAL unknown, not smaller.
+    #
+    # The previous revision defaulted each missing term to 0.0 via
+    # `next(..., 0.0)` and emitted the sum with status OK — so a frame with every
+    # sensor MISSING produced "total road load = 0.0 N, status OK". That is
+    # fabrication, and it is what CLAUDE.md section 8 rule 2 forbids.
+    _component_names = (
+        "rolling_resistance_force_n",
+        "aerodynamic_drag_force_n",
+        "grade_resistance_force_n",
+        "inertial_force_n",
     )
-    f_aero_val = next(
-        (f.value for f in features if f.name == "aerodynamic_drag_force_n"
-         and f.status == FeatureStatus.OK), 0.0
-    )
-    f_grade_val = next(
-        (f.value for f in features if f.name == "grade_resistance_force_n"
-         and f.status == FeatureStatus.OK), 0.0
-    )
-    f_inertia_val = next(
-        (f.value for f in features if f.name == "inertial_force_n"
-         and f.status == FeatureStatus.OK), 0.0
-    )
-    total_road_load = f_roll_val + f_aero_val + f_grade_val + f_inertia_val
-    features.append(Feature(
-        name="total_road_load_force_n",
-        value=total_road_load,
-        unit="N",
-        status=FeatureStatus.OK,
-        unavailable_reason=None,
-        directionality=Directionality.NATURAL,
-        classification=Classification.C,
-        inputs=("tpms_pressure_kpa", "tpms_temperature_c",
-                "vehicle_speed_ms", "accel_long_ms2"),
-        corner=None,
-        timestamp_s=ts,
-        provenance=prov,
-        extractor_version=EXTRACTOR_VERSION,
-    ))
+    _by_name = {f.name: f for f in features}
+    _components = [_by_name[n] for n in _component_names]
+    _missing = [c.name for c in _components if c.status is not FeatureStatus.OK]
 
-    # --- Road load coefficient (classification C) ---
-    # C_road = F_total / (m * g * v) — the normalised road load.
+    _total_inputs = ("tpms_pressure_kpa", "tpms_temperature_c",
+                     "vehicle_speed_ms", "accel_long_ms2")
+
+    if _missing:
+        total_road_load = None
+        features.append(Feature(
+            name="total_road_load_force_n",
+            value=None,
+            unit="N",
+            status=FeatureStatus.UNAVAILABLE,
+            unavailable_reason=(
+                "Cannot sum road load: component(s) unavailable — "
+                + ", ".join(_missing)
+            ),
+            directionality=Directionality.NATURAL,
+            classification=Classification.C,
+            inputs=_total_inputs,
+            corner=None,
+            timestamp_s=ts,
+            provenance=prov,
+            extractor_version=EXTRACTOR_VERSION,
+        ))
+    else:
+        total_road_load = sum(c.value for c in _components)
+        features.append(Feature(
+            name="total_road_load_force_n",
+            value=total_road_load,
+            unit="N",
+            status=FeatureStatus.OK,
+            unavailable_reason=None,
+            directionality=Directionality.NATURAL,
+            classification=Classification.C,
+            inputs=_total_inputs,
+            corner=None,
+            timestamp_s=ts,
+            provenance=prov,
+            extractor_version=EXTRACTOR_VERSION,
+        ))
+
+        # --- Road load coefficient (dimensionless) ---
+    # B1 FIX: This is the dimensionless C_rr mean, matching the legacy
+    # estimator's predicted quantity: C_rr + F_toe/(m*g).
+    # It does NOT include aero, inertia, or division by v -- those belong
+    # to the force features above, not the estimator-facing coefficient.
     # Classification C: project hypothesis.
     # Falsifier: independent coast-down or dyno rolling-resistance measurement.
-    # Directionality NATURAL: signed-positive by construction (energy is
-    # consumed, not produced, in steady state).
-    if v_ms is not None and v_ms > 1.0:  # avoid division by near-zero speed
-        c_road = total_road_load / (vehicle_config.mass_kg * _G_MS2 * v_ms)
+    if c_rr_mean is not None:
         features.append(Feature(
             name="road_load_coefficient",
-            value=c_road,
+            value=c_rr_mean,
             unit="",
             status=FeatureStatus.OK,
             unavailable_reason=None,
             directionality=Directionality.NATURAL,
             classification=Classification.C,
-            inputs=("tpms_pressure_kpa", "tpms_temperature_c",
-                    "vehicle_speed_ms", "accel_long_ms2"),
+            inputs=("tpms_pressure_kpa", "tpms_temperature_c"),
             corner=None,
             timestamp_s=ts,
             provenance=prov,
@@ -336,31 +369,20 @@ def extract(
             unit="",
             status=FeatureStatus.UNAVAILABLE,
             unavailable_reason=(
-                "Vehicle speed unavailable or too low for coefficient calculation"
+                "No corners with valid pressure and temperature data"
             ),
             directionality=Directionality.NATURAL,
             classification=Classification.C,
-            inputs=("vehicle_speed_ms",),
+            inputs=("tpms_pressure_kpa", "tpms_temperature_c"),
             corner=None,
             timestamp_s=ts,
             provenance=prov,
             extractor_version=EXTRACTOR_VERSION,
         ))
 
-    # --- CdA parameter feature (for transparency) ---
-    features.append(Feature(
-        name="effective_CdA_m2",
-        value=cda,
-        unit="m²",
-        status=FeatureStatus.OK,
-        unavailable_reason=None,
-        directionality=Directionality.NATURAL,
-        classification=Classification.C,
-        inputs=(),
-        corner=None,
-        timestamp_s=ts,
-        provenance=prov,
-        extractor_version=EXTRACTOR_VERSION,
-    ))
+    # effective_CdA_m2 is deliberately NOT emitted: it is an echo of two
+    # RoadLoadParams inputs (drag_coefficient * frontal_area_m2), not an
+    # observable extracted from telemetry. Emitting config back as a "feature"
+    # inflates the feature count with something no sensor contributed to.
 
     return tuple(features)

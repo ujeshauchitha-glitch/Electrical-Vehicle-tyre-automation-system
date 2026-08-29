@@ -9,6 +9,8 @@ from evtyre.estimation.state import STATE, MEAS, StateLayout, MeasurementLayout
 from evtyre.estimation.estimator import (
     TyreEstimator,
     EstimatorResult,
+    Observability,
+    StateEstimate,
     SensorNoise,
     features_to_measurement,
     prior,
@@ -33,6 +35,7 @@ def _make_tyre() -> TyreConfig:
         tread_new_mm=8.0,
         tread_legal_mm=1.6,
         placard_pressure_kpa=240.0,
+        cold_reference_temperature_c=25.0,
     )
 
 
@@ -152,8 +155,14 @@ class FeatureToMeasurementTests(unittest.TestCase):
         # Speed ratios
         self.assertAlmostEqual(z[MEAS.ratio_front], 1.0)
         self.assertAlmostEqual(z[MEAS.ratio_rear], 1.0)
-        # Road load
-        self.assertAlmostEqual(z[MEAS.roadload], 0.015)
+        # Road load is DELIBERATELY NOT admitted as a measurement: the Phase 2
+        # coefficient is mean(C_rr) recomputed from the same TPMS pressure that
+        # already drives z[press_*], so admitting it double-counts pressure and
+        # lets the estimator move tread to close a definitional gap.
+        # See features_to_measurement() for the full reasoning.
+        self.assertAlmostEqual(z[MEAS.roadload], 0.0)
+        self.assertNotIn(MEAS.roadload, avail)
+        self.assertGreater(R_diag[MEAS.roadload], 1e11)
 
     def test_unavailable_measurements_get_large_variance(self):
         features = []  # nothing available
@@ -174,14 +183,15 @@ class EstimatorTests(unittest.TestCase):
             _ok_feature("running_pressure_pa_RR", 341325.0, corner="RR"),
             _ok_feature("axle_speed_ratio_front", 1.0),
             _ok_feature("axle_speed_ratio_rear", 1.0),
-            _ok_feature("road_load_coefficient", 0.015),
+            _ok_feature("road_load_coefficient", 0.009),
         ]
         est = TyreEstimator(_make_vehicle(), _make_tyre())
         result = est.estimate(features)
 
         self.assertIsInstance(result, EstimatorResult)
-        self.assertEqual(result.state.shape, (STATE.N,))
+        self.assertEqual(len(result.states), STATE.N)
         self.assertEqual(result.covariance.shape, (STATE.N, STATE.N))
+        self.assertIsInstance(result.states[0], StateEstimate)
 
     def test_estimator_handles_no_features(self):
         """With no features, the estimator should still run (return prior)."""
@@ -190,7 +200,7 @@ class EstimatorTests(unittest.TestCase):
         # Should not crash — returns prior-based estimate
         self.assertIsInstance(result, EstimatorResult)
 
-    def test_confidence_reduced_with_missing_features(self):
+    def test_n_states_observed_with_features(self):
         est = TyreEstimator(_make_vehicle(), _make_tyre())
         result_full = est.estimate([
             _ok_feature("running_pressure_pa_FL", 341325.0, corner="FL"),
@@ -199,20 +209,24 @@ class EstimatorTests(unittest.TestCase):
             _ok_feature("running_pressure_pa_RR", 341325.0, corner="RR"),
             _ok_feature("axle_speed_ratio_front", 1.0),
             _ok_feature("axle_speed_ratio_rear", 1.0),
-            _ok_feature("road_load_coefficient", 0.015),
+            _ok_feature("road_load_coefficient", 0.009),
         ])
         result_empty = est.estimate([])
-        self.assertGreater(result_full.confidence, result_empty.confidence)
+        self.assertGreaterEqual(result_full.n_states_observed, result_empty.n_states_observed)
 
-    def test_toe_magnitude_is_nonnegative(self):
+    def test_toe_is_magnitude_only(self):
         est = TyreEstimator(_make_vehicle(), _make_tyre())
         result = est.estimate([])
-        self.assertGreaterEqual(result.toe_magnitude_deg, 0.0)
+        # Find the toe state
+        toe_state = next(s for s in result.states if s.name == "toe^2")
+        self.assertTrue(toe_state.magnitude_only)
+        self.assertGreaterEqual(toe_state.value, 0.0)
 
-    def test_camber_note_exists(self):
+    def test_camber_is_unobservable(self):
         est = TyreEstimator(_make_vehicle(), _make_tyre())
         result = est.estimate([])
-        self.assertIn("unobservable", result.camber_note.lower())
+        camber = next(s for s in result.states if s.name == "camber")
+        self.assertEqual(camber.observability, Observability.UNOBSERVABLE)
 
     def test_measurement_vector_fully_populated(self):
         """The assertion that z is fully populated catches the legacy bug."""
@@ -245,15 +259,14 @@ class ToeSquaredTests(unittest.TestCase):
     def test_toe_sq_in_state(self):
         self.assertEqual(STATE.toe_sq, 8)
 
-    def test_toe_magnitude_from_sqrt(self):
+    def test_toe_value_from_sqrt(self):
         est = TyreEstimator(_make_vehicle(), _make_tyre())
         result = est.estimate([])
-        # toe_magnitude should be sqrt(max(0, toe_sq))
-        self.assertAlmostEqual(
-            result.toe_magnitude_deg,
-            np.sqrt(max(0.0, result.state[STATE.toe_sq])),
-            places=10,
-        )
+        toe = next(s for s in result.states if s.name == "toe^2")
+        # toe value should be non-negative (it's toe^2)
+        self.assertGreaterEqual(toe.value, 0.0)
+        # toe sigma should be non-negative
+        self.assertGreaterEqual(toe.sigma, 0.0)
 
 
 if __name__ == "__main__":

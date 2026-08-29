@@ -74,6 +74,7 @@ def main() -> None:
         tread_new_mm=7.5,
         tread_legal_mm=1.6,
         placard_pressure_kpa=240.0,
+        cold_reference_temperature_c=25.0,
     )
 
     print("Vehicle Configuration:")
@@ -145,17 +146,23 @@ def main() -> None:
     # --- Estimator output ---
     print("Estimator Output:")
     print("-" * 50)
-    for i, name in enumerate(result.state_names):
-        val = result.state[i]
-        sigma = result.covariance[i, i] ** 0.5
-        print(f"  {name:<15} {val:>10.4f}  ± {sigma:.4f}")
+    for s in result.states:
+        obs_tag = s.observability.value.upper()
+        if s.magnitude_only:
+            obs_tag += " [magnitude-only]"
+        if s.reason:
+            print(f"  {s.name:<15} {s.value:>10.4f}  +/- {s.sigma:.4f}  {obs_tag}")
+            print(f"    {s.reason}")
+        else:
+            print(f"  {s.name:<15} {s.value:>10.4f}  +/- {s.sigma:.4f}  {obs_tag}")
     print()
-    print(f"  Toe magnitude:  {result.toe_magnitude_deg:.4f} deg")
-    print(f"  Confidence:     {result.confidence:.1%} "
-          f"({result.n_available}/{result.n_total} measurements)")
-    print(f"  Note:           {result.camber_note}")
-    print()
-    print("=" * 70)
+    print(f"  States observed:  {result.n_states_observed}/{len(result.states)}")
+    print(f"  Mean var. reduction: {result.mean_variance_reduction:.4f}"
+          f"   (over OBSERVED states only)")
+    print(f"  Measurements:     {result.n_measurements_available} channels admitted")
+    if result.singular_matrix:
+        print("  WARNING: Singular update matrix")
+
     print("  Demo complete.")
     print("=" * 70)
 

@@ -37,7 +37,7 @@ class ResonanceStubTests(unittest.TestCase):
             resonance.extract(
                 _make_frame(),
                 VehicleConfig("v", 1800.0, 0.48, DriveLayout.RWD),
-                TyreConfig("t", 0.322, 8.0, 1.6, 240.0),
+                TyreConfig("t", 0.322, 8.0, 1.6, 240.0, 25.0),
             )
         self.assertIn("G1", str(ctx.exception))
 
@@ -47,7 +47,7 @@ class ResonanceStubTests(unittest.TestCase):
             resonance.extract(
                 _make_frame(),
                 VehicleConfig("v", 1800.0, 0.48, DriveLayout.RWD),
-                TyreConfig("t", 0.322, 8.0, 1.6, 240.0),
+                TyreConfig("t", 0.322, 8.0, 1.6, 240.0, 25.0),
             )
         self.assertIn("G1", str(ctx.exception))
 
@@ -57,7 +57,7 @@ class ResonanceStubTests(unittest.TestCase):
             result = resonance.extract(
                 _make_frame(),
                 VehicleConfig("v", 1800.0, 0.48, DriveLayout.RWD),
-                TyreConfig("t", 0.322, 8.0, 1.6, 240.0),
+                TyreConfig("t", 0.322, 8.0, 1.6, 240.0, 25.0),
             )
             # If we get here, the stub returned something instead of raising
             self.fail(
@@ -74,7 +74,7 @@ class ResonanceStubTests(unittest.TestCase):
             resonance.extract(
                 _make_frame(),
                 VehicleConfig("v", 1800.0, 0.48, DriveLayout.RWD),
-                TyreConfig("t", 0.322, 8.0, 1.6, 240.0),
+                TyreConfig("t", 0.322, 8.0, 1.6, 240.0, 25.0),
             )
         self.assertIn("windowed sample", str(ctx.exception).lower())
 

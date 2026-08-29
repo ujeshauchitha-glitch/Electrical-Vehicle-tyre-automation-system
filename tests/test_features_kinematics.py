@@ -26,6 +26,7 @@ def _make_tyre() -> TyreConfig:
         tread_new_mm=8.0,
         tread_legal_mm=1.6,
         placard_pressure_kpa=240.0,
+        cold_reference_temperature_c=25.0,
     )
 
 

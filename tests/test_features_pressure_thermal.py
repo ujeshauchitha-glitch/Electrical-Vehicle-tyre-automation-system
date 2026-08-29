@@ -27,6 +27,7 @@ def _make_tyre() -> TyreConfig:
         tread_new_mm=8.0,
         tread_legal_mm=1.6,
         placard_pressure_kpa=240.0,
+        cold_reference_temperature_c=25.0,
     )
 
 
@@ -102,7 +103,7 @@ class RunningPressureTests(unittest.TestCase):
 class ColdEquivalentPressureTests(unittest.TestCase):
     def test_cold_equivalent_uses_gas_law(self):
         """Gay-Lussac: P_cold = P * T_ref / T_running."""
-        # At 30 °C = 303.15 K, P_cold should be P_running * 293.15 / 303.15
+        # At 30 C = 303.15 K, P_cold should be P_running * 298.15 / 303.15 (ref = 25 C from TyreConfig)
         frame = _make_frame(
             tpms_pressure_kpa=_ok_per_corner(240.0, "p"),
             tpms_temperature_c=_ok_per_corner(30.0, "t"),
@@ -111,7 +112,7 @@ class ColdEquivalentPressureTests(unittest.TestCase):
         for corner in CORNERS:
             f = _by_name(features, f"cold_equivalent_pressure_pa_{corner}")[0]
             p_running_pa = (240_000.0 + pt.ATMOSPHERIC_PRESSURE_PA)
-            expected = p_running_pa * 293.15 / 303.15
+            expected = p_running_pa * 298.15 / 303.15
             self.assertAlmostEqual(f.value, expected, places=2)
             self.assertEqual(f.status, FeatureStatus.OK)
 
