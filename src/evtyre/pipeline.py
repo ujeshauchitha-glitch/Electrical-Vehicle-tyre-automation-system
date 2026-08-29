@@ -13,6 +13,7 @@ from typing import Callable, Sequence
 from .config.tyre import TyreConfig
 from .config.vehicle import VehicleConfig
 from .estimation.estimator import EstimatorResult, TyreEstimator
+from .estimation.schema import TyreStateEstimate
 from .features.contract import (
     Classification,
     Directionality,
@@ -124,15 +125,20 @@ class Pipeline:
     def estimate(
         self,
         features: Sequence[Feature],
-    ) -> EstimatorResult:
-        """Run the estimator on extracted features."""
+    ) -> TyreStateEstimate:
+        """Run the estimator on extracted features.
+
+        Returns a TyreStateEstimate (the Phase 3 -> Phase 4 contract),
+        not a raw EstimatorResult.
+        """
         estimator = TyreEstimator(self.vehicle_config, self.tyre_config)
-        return estimator.estimate(features)
+        result = estimator.estimate(features)
+        return estimator.to_schema(result, features)
 
     def run(
         self,
         frame: TelemetryFrame,
-    ) -> tuple[tuple[Feature, ...], EstimatorResult]:
+    ) -> tuple[tuple[Feature, ...], TyreStateEstimate]:
         """Full pipeline: extract features, then estimate.
 
         Returns (features, estimator_result).

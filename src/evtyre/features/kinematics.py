@@ -12,18 +12,13 @@ Key project rules:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from ..config.tyre import TyreConfig
-from ..config.vehicle import DriveLayout, VehicleConfig
-from ..schema.common import CORNERS, SensorReading, SensorStatus
+from ..config.vehicle import VehicleConfig
+from ..schema.common import CORNERS
 from ..schema.telemetry import TelemetryFrame
 from .contract import Classification, Directionality, Feature, FeatureStatus
 
-if TYPE_CHECKING:
-    pass
-
-EXTRACTOR_VERSION = "0.1.0"
+EXTRACTOR_VERSION = "0.2.0"
 
 # Minimum vehicle speed (m/s) for slip-ratio calculation.  Below this,
 # the ratio is dominated by noise and is not physically meaningful.
@@ -276,24 +271,21 @@ def extract(
 
     # --- Axle-pair speed ratios ---
     # Compare a wheel to its axle partner only, never cross-axle.
-    features.extend(_axle_speed_ratio_features(
-        frame, "FL", "FR", "front", ts, prov,
-    ))
-    features.extend(_axle_speed_ratio_features(
-        frame, "RL", "RR", "rear", ts, prov,
-    ))
-
-    # --- Front-to-rear axle speed ratio difference ---
-    # Differences between the two axle ratios can indicate different
-    # wear states, but are NOT used for cross-axle comparison of
-    # individual wheels.
     front_ratio = _axle_speed_ratio_features(
         frame, "FL", "FR", "front", ts, prov,
     )
     rear_ratio = _axle_speed_ratio_features(
         frame, "RL", "RR", "rear", ts, prov,
     )
-    # Both need to be OK to compute the difference
+    features.extend(front_ratio)
+    features.extend(rear_ratio)
+
+    # --- Front-to-rear axle speed ratio difference ---
+    # Differences between the two axle ratios can indicate different
+    # wear states, but are NOT used for cross-axle comparison of
+    # individual wheels.
+    # Reuses the features computed just above rather than recomputing both
+    # axles a second time.
     fr_feat = [f for f in front_ratio if f.name == "axle_speed_ratio_front"]
     rr_feat = [f for f in rear_ratio if f.name == "axle_speed_ratio_rear"]
     if fr_feat and rr_feat and fr_feat[0].status == FeatureStatus.OK and rr_feat[0].status == FeatureStatus.OK:

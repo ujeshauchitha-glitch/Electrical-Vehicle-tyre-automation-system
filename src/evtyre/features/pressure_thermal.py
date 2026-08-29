@@ -5,31 +5,24 @@ Key project rules:
   Temperature compensation is a REPORTING step, never input-conditioning.
 - The cold-equivalent normalisation uses Gay-Lussac's law (P/T = const at
   constant volume): P_cold = P_running * T_ref / T_running, where T_ref is
-  a reference temperature (20 °C = 293.15 K).  Classification: B.
+  the cold_reference_temperature from TyreConfig (default 25 °C).  Classification: B.
 - Missing TPMS on a corner → that corner's features are UNAVAILABLE with a
   reason.  The other three corners still produce features normally.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from ..config.tyre import TyreConfig
 from ..config.vehicle import VehicleConfig
-from ..schema.common import CORNERS, SensorReading, SensorStatus
+from ..schema.common import CORNERS
 from ..schema.telemetry import TelemetryFrame
 from .contract import Classification, Directionality, Feature, FeatureStatus
-
-if TYPE_CHECKING:
-    pass
 
 EXTRACTOR_VERSION = "0.1.0"
 
 # Atmospheric pressure in Pa (standard sea-level).
 ATMOSPHERIC_PRESSURE_PA: float = 101_325.0
 
-# Reference temperature for cold-equivalent normalisation (20 °C in Kelvin).
-_T_REF_K: float = 293.15
 _C_TO_K: float = 273.15
 
 
@@ -152,7 +145,8 @@ def extract(
                 ))
             else:
                 # Gay-Lussac: P/T = const → P_cold = P_running * T_ref / T_running
-                p_cold_pa = ((p_kpa * 1000.0) + ATMOSPHERIC_PRESSURE_PA) * _T_REF_K / t_k
+                t_ref_k = tyre_config.cold_reference_temperature_c + _C_TO_K
+                p_cold_pa = ((p_kpa * 1000.0) + ATMOSPHERIC_PRESSURE_PA) * t_ref_k / t_k
                 features.append(Feature(
                     name=f"cold_equivalent_pressure_pa_{corner}",
                     value=p_cold_pa,

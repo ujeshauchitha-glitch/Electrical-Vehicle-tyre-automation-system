@@ -21,7 +21,7 @@ def _make_vehicle() -> VehicleConfig:
 
 
 def _make_tyre() -> TyreConfig:
-    return TyreConfig("test", 0.322, 8.0, 1.6, 240.0)
+    return TyreConfig("test", 0.322, 8.0, 1.6, 240.0, 25.0)
 
 
 def _ok_per_corner(value: float) -> dict[str, SensorReading]:

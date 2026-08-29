@@ -49,6 +49,7 @@ class TyreConfigTests(unittest.TestCase):
             tread_new_mm=8.0,
             tread_legal_mm=1.6,
             placard_pressure_kpa=240.0,
+            cold_reference_temperature_c=25.0,
         )
         self.assertEqual(cfg.tread_new_mm, 8.0)
 
@@ -60,6 +61,7 @@ class TyreConfigTests(unittest.TestCase):
                 tread_new_mm=1.6,
                 tread_legal_mm=1.6,
                 placard_pressure_kpa=240.0,
+            cold_reference_temperature_c=25.0,
             )
 
     def test_rejects_non_positive_placard_pressure(self):
@@ -70,6 +72,7 @@ class TyreConfigTests(unittest.TestCase):
                 tread_new_mm=8.0,
                 tread_legal_mm=1.6,
                 placard_pressure_kpa=0.0,
+            cold_reference_temperature_c=25.0,
             )
 
 

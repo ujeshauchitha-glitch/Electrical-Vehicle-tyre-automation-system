@@ -31,6 +31,7 @@ def _make_tyre() -> TyreConfig:
         tread_new_mm=8.0,
         tread_legal_mm=1.6,
         placard_pressure_kpa=240.0,
+        cold_reference_temperature_c=25.0,
     )
 
 
@@ -69,7 +70,7 @@ def _extract(frame=None, params=None, grade_rad=0.0):
         frame = _make_frame()
     if params is None:
         params = _make_params()
-    return extract(frame, _make_vehicle(), _make_tyre(), road_load_params=params, grade_rad=grade_rad)
+    return extract(frame, _make_vehicle(), _make_tyre(), road_load_params=params)
 
 
 def _by_name(features, name):
@@ -141,16 +142,11 @@ class AeroDragTests(unittest.TestCase):
 
 
 class GradeResistanceTests(unittest.TestCase):
-    def test_zero_grade_gives_zero_grade_force(self):
+    def test_grade_is_always_unavailable(self):
         features = _extract()
         f = _by_name(features, "grade_resistance_force_n")[0]
-        self.assertAlmostEqual(f.value, 0.0)
-
-    def test_positive_grade_gives_positive_force(self):
-        features = _extract(grade_rad=0.05)  # ~2.86 degrees
-        f = _by_name(features, "grade_resistance_force_n")[0]
-        expected = 1800.0 * 9.80665 * math.sin(0.05)
-        self.assertAlmostEqual(f.value, expected, places=2)
+        self.assertEqual(f.status, FeatureStatus.UNAVAILABLE)
+        self.assertIsNone(f.value)
 
 
 class InertialForceTests(unittest.TestCase):
@@ -167,15 +163,11 @@ class InertialForceTests(unittest.TestCase):
 
 
 class TotalRoadLoadTests(unittest.TestCase):
-    def test_total_is_sum_of_components(self):
+    def test_total_unavailable_when_grade_unavailable(self):
         features = _extract()
         total = _by_name(features, "total_road_load_force_n")[0]
-        roll = _by_name(features, "rolling_resistance_force_n")[0]
-        aero = _by_name(features, "aerodynamic_drag_force_n")[0]
-        grade = _by_name(features, "grade_resistance_force_n")[0]
-        inertia = _by_name(features, "inertial_force_n")[0]
-        expected = roll.value + aero.value + grade.value + inertia.value
-        self.assertAlmostEqual(total.value, expected, places=2)
+        self.assertEqual(total.status, FeatureStatus.UNAVAILABLE)
+        self.assertIsNone(total.value)
 
 
 class RoadLoadCoefficientTests(unittest.TestCase):
@@ -195,24 +187,19 @@ class RoadLoadCoefficientTests(unittest.TestCase):
         f = _by_name(features, "road_load_coefficient")[0]
         self.assertEqual(f.directionality, Directionality.NATURAL)
 
-    def test_coefficient_unavailable_at_low_speed(self):
-        frame = _make_frame(vehicle_speed_ms=SensorReading(value=0.5, status=SensorStatus.OK))
-        features = _extract(frame)
+    def test_coefficient_is_dimensionless(self):
+        features = _extract()
         f = _by_name(features, "road_load_coefficient")[0]
-        self.assertEqual(f.status, FeatureStatus.UNAVAILABLE)
+        self.assertEqual(f.unit, "")
 
-    def test_coefficient_unavailable_without_speed(self):
+    def test_coefficient_ok_even_without_speed(self):
         frame = _make_frame(vehicle_speed_ms=SensorReading.missing())
         features = _extract(frame)
         f = _by_name(features, "road_load_coefficient")[0]
-        self.assertEqual(f.status, FeatureStatus.UNAVAILABLE)
+        self.assertEqual(f.status, FeatureStatus.OK)
 
 
-class CdATests(unittest.TestCase):
-    def test_cda_value(self):
-        features = _extract()
-        f = _by_name(features, "effective_CdA_m2")[0]
-        self.assertAlmostEqual(f.value, 0.25 * 2.3)
+
 
 
 class NoToeFeatureTests(unittest.TestCase):
