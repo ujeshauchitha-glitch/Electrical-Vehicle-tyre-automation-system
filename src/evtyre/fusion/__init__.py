@@ -21,6 +21,14 @@ from .maintenance import cold_equivalent_pressure_kpa, maintenance_view
 from .multisnapshot import SnapshotFusionError, fuse_snapshots
 from .report import REPORT_SCHEMA_VERSION, FusedTyreReport, build_report
 from .traction import torque_ceiling, wet_friction
+from .trend import TrendClassification, TrendReport, TrendResult, detect_trends, format_trend_report
+from .forecast import (
+    DegradationForecast,
+    MaintenanceForecast,
+    Urgency,
+    compute_forecasts,
+    format_forecast,
+)
 
 __all__ = [
     "Decision",
@@ -39,4 +47,15 @@ __all__ = [
     "FusedTyreReport",
     "build_report",
     "REPORT_SCHEMA_VERSION",
+    # Phase 5: temporal degradation
+    "TrendClassification",
+    "TrendReport",
+    "TrendResult",
+    "detect_trends",
+    "format_trend_report",
+    "DegradationForecast",
+    "MaintenanceForecast",
+    "Urgency",
+    "compute_forecasts",
+    "format_forecast",
 ]
