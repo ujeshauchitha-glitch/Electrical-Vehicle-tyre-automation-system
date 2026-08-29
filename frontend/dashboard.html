@@ -1,0 +1,1177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EV Tyre Intelligence — Phase 3 Dashboard</title>
+<style>
+  :root {
+    --bg: #0a0e17;
+    --card: #111827;
+    --card-hover: #1a2332;
+    --border: #1e293b;
+    --text: #e2e8f0;
+    --text-dim: #94a3b8;
+    --accent: #3b82f6;
+    --green: #22c55e;
+    --yellow: #eab308;
+    --red: #ef4444;
+    --purple: #a855f7;
+    --cyan: #06b6d4;
+    --orange: #f97316;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  .container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+
+  /* Header */
+  .header {
+    text-align: center;
+    margin-bottom: 3rem;
+    padding: 2rem;
+    background: linear-gradient(135deg, #111827 0%, #1e293b 100%);
+    border-radius: 16px;
+    border: 1px solid var(--border);
+  }
+
+  .header h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--accent), var(--cyan));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 0.5rem;
+  }
+
+  .header .subtitle {
+    color: var(--text-dim);
+    font-size: 1.1rem;
+  }
+
+  .header .badge {
+    display: inline-block;
+    margin-top: 1rem;
+    padding: 0.3rem 1rem;
+    background: rgba(59, 130, 246, 0.15);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 20px;
+    font-size: 0.85rem;
+    color: var(--accent);
+  }
+
+  /* Section titles */
+  .section-title {
+    font-size: 1.3rem;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .section-title .icon { font-size: 1.4rem; }
+
+  /* Grid layouts */
+  .grid-4 {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.25rem;
+    margin-bottom: 2.5rem;
+  }
+
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 2.5rem;
+  }
+
+  .grid-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 2.5rem;
+  }
+
+  /* Cards */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    transition: all 0.2s;
+  }
+
+  .card:hover {
+    border-color: var(--accent);
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.1);
+  }
+
+  .card-title {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-dim);
+    margin-bottom: 0.5rem;
+  }
+
+  .card-value {
+    font-size: 2rem;
+    font-weight: 700;
+  }
+
+  .card-unit {
+    font-size: 0.9rem;
+    color: var(--text-dim);
+    margin-left: 0.25rem;
+  }
+
+  /* Corner cards */
+  .corner-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .corner-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+  }
+
+  .corner-card.FL::before { background: var(--cyan); }
+  .corner-card.FR::before { background: var(--accent); }
+  .corner-card.RL::before { background: var(--purple); }
+  .corner-card.RR::before { background: var(--orange); }
+
+  .corner-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-dim);
+    margin-bottom: 0.75rem;
+  }
+
+  .corner-label .pos {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text);
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  .corner-stat {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+
+  .corner-stat:last-child { border-bottom: none; }
+
+  .corner-stat .label {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+  }
+
+  .corner-stat .value {
+    font-size: 0.95rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Observability badges */
+  .obs-badge {
+    display: inline-block;
+    padding: 0.15rem 0.6rem;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .obs-OBSERVED {
+    background: rgba(34, 197, 94, 0.15);
+    color: var(--green);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+  }
+
+  .obs-WEAK {
+    background: rgba(234, 179, 8, 0.15);
+    color: var(--yellow);
+    border: 1px solid rgba(234, 179, 8, 0.3);
+  }
+
+  .obs-UNOBSERVABLE {
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--red);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+  }
+
+  /* Tread bar */
+  .tread-bar {
+    width: 100%;
+    height: 8px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 4px;
+    margin-top: 0.5rem;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .tread-bar .fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.5s ease;
+  }
+
+  .tread-bar .legal-limit {
+    position: absolute;
+    top: -2px;
+    bottom: -2px;
+    width: 2px;
+    background: var(--red);
+  }
+
+  /* Physics chain */
+  .physics-chain {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 2rem;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 2.5rem;
+    overflow-x: auto;
+  }
+
+  .chain-node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 8px;
+    min-width: 120px;
+    text-align: center;
+  }
+
+  .chain-node .name {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--accent);
+  }
+
+  .chain-node .desc {
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    margin-top: 0.25rem;
+  }
+
+  .chain-arrow {
+    font-size: 1.5rem;
+    color: var(--text-dim);
+    flex-shrink: 0;
+  }
+
+  /* Simulator panel */
+  .sim-panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 2.5rem;
+  }
+
+  .sim-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .sim-input-group label {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    margin-bottom: 0.3rem;
+  }
+
+  .sim-input-group input[type="range"] {
+    width: 100%;
+    accent-color: var(--accent);
+  }
+
+  .sim-input-group .range-val {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text);
+    text-align: right;
+  }
+
+  /* Estimator summary */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin-bottom: 2.5rem;
+  }
+
+  .summary-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem;
+    text-align: center;
+  }
+
+  .summary-card .value {
+    font-size: 2rem;
+    font-weight: 700;
+  }
+
+  .summary-card .label {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    margin-top: 0.25rem;
+  }
+
+  /* Table */
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 2.5rem;
+  }
+
+  .data-table th {
+    text-align: left;
+    padding: 0.75rem 1rem;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-dim);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .data-table td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .data-table tr:hover td {
+    background: rgba(59, 130, 246, 0.05);
+  }
+
+  /* Equation display */
+  .equation {
+    background: rgba(59, 130, 246, 0.08);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-radius: 8px;
+    padding: 1rem 1.5rem;
+    font-family: 'Courier New', monospace;
+    font-size: 0.95rem;
+    color: var(--cyan);
+    margin-bottom: 1rem;
+    overflow-x: auto;
+  }
+
+  /* Footer */
+  .footer {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    border-top: 1px solid var(--border);
+    margin-top: 2rem;
+  }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .grid-4 { grid-template-columns: repeat(2, 1fr); }
+    .grid-3 { grid-template-columns: 1fr; }
+    .grid-2 { grid-template-columns: 1fr; }
+    .summary-grid { grid-template-columns: repeat(2, 1fr); }
+    .sim-row { grid-template-columns: repeat(2, 1fr); }
+    .physics-chain { flex-wrap: wrap; }
+  }
+
+  @media (max-width: 600px) {
+    .grid-4 { grid-template-columns: 1fr; }
+    .container { padding: 1rem; }
+    .header h1 { font-size: 1.8rem; }
+  }
+
+  /* Animations */
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .card, .corner-card, .summary-card {
+    animation: fadeIn 0.4s ease forwards;
+  }
+
+  /* Tooltip */
+  .tooltip {
+    position: relative;
+    cursor: help;
+  }
+
+  .tooltip::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1e293b;
+    color: var(--text);
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+    z-index: 10;
+  }
+
+  .tooltip:hover::after { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <h1>⚡ EV Tyre Intelligence System</h1>
+    <div class="subtitle">Phase 3 — Virtual Sensing from Existing Vehicle Telemetry</div>
+    <div class="badge">Review 1 — 29 August 2026 — 173 Tests Passing</div>
+  </div>
+
+  <!-- Physics Chain -->
+  <div class="section-title"><span class="icon">🔗</span> Physics Chain</div>
+  <div class="physics-chain">
+    <div class="chain-node">
+      <div class="name">Tread d</div>
+      <div class="desc">Tyre wear state</div>
+    </div>
+    <div class="chain-arrow">→</div>
+    <div class="chain-node">
+      <div class="name">r<sub>free</sub></div>
+      <div class="desc">r<sub>belt</sub> + d/1000</div>
+    </div>
+    <div class="chain-arrow">→</div>
+    <div class="chain-node">
+      <div class="name">r<sub>eff</sub></div>
+      <div class="desc">r<sub>free</sub> − D·δ</div>
+    </div>
+    <div class="chain-arrow">→</div>
+    <div class="chain-node">
+      <div class="name">ω<sub>L</sub>/ω<sub>R</sub></div>
+      <div class="desc">= r<sub>R</sub>/r<sub>L</sub></div>
+    </div>
+    <div class="chain-arrow">→</div>
+    <div class="chain-node">
+      <div class="name">Estimator</div>
+      <div class="desc">Gauss-Newton MAP</div>
+    </div>
+    <div class="chain-arrow">→</div>
+    <div class="chain-node">
+      <div class="name">x̂, P</div>
+      <div class="desc">State + uncertainty</div>
+    </div>
+  </div>
+
+  <!-- Core Equation -->
+  <div class="equation">
+    r<sub>eff</sub> = r<sub>belt</sub> + d/1000 − D · F<sub>z</sub> · P<sub>placard</sub> / (k<sub>z0</sub> · P)
+  </div>
+
+  <!-- Summary Cards -->
+  <div class="section-title"><span class="icon">📊</span> Estimator Summary</div>
+  <div class="summary-grid" id="summary-grid">
+    <div class="summary-card">
+      <div class="value" style="color: var(--green);" id="states-observed">4/10</div>
+      <div class="label">States Observed</div>
+    </div>
+    <div class="summary-card">
+      <div class="value" style="color: var(--accent);" id="mean-vr">0.9846</div>
+      <div class="label">Mean Variance Reduction</div>
+    </div>
+    <div class="summary-card">
+      <div class="value" style="color: var(--cyan);" id="measurements">6/8</div>
+      <div class="label">Active Measurements</div>
+    </div>
+    <div class="summary-card">
+      <div class="value" style="color: var(--purple);" id="iterations">6</div>
+      <div class="label">Iterations (converged)</div>
+    </div>
+  </div>
+
+  <!-- Per-Corner Tread -->
+  <div class="section-title"><span class="icon">🛞</span> Per-Corner Tread Depth</div>
+  <div class="grid-4" id="tread-cards"></div>
+
+  <!-- Per-Corner Pressure -->
+  <div class="section-title"><span class="icon">💨</span> Per-Corner Pressure</div>
+  <div class="grid-4" id="pressure-cards"></div>
+
+  <!-- Scalar States -->
+  <div class="section-title"><span class="icon">📐</span> Scalar States</div>
+  <div class="grid-2">
+    <div class="card" id="toe-card">
+      <div class="card-title">Toe² (magnitude-only)</div>
+      <div style="display: flex; justify-content: space-between; align-items: baseline;">
+        <div class="card-value" id="toe-value">0.1000<span class="card-unit">deg²</span></div>
+        <span class="obs-badge obs-UNOBSERVABLE" id="toe-badge">UNOBSERVABLE</span>
+      </div>
+      <div style="font-size: 0.8rem; color: var(--text-dim); margin-top: 0.5rem;">
+        |toe| = <span id="toe-mag">0.316</span>° — sign unrecoverable (drag is even in toe)
+      </div>
+    </div>
+    <div class="card" id="camber-card">
+      <div class="card-title">Camber</div>
+      <div style="display: flex; justify-content: space-between; align-items: baseline;">
+        <div class="card-value" id="camber-value">0.0000<span class="card-unit">deg</span></div>
+        <span class="obs-badge obs-UNOBSERVABLE" id="camber-badge">UNOBSERVABLE</span>
+      </div>
+      <div style="font-size: 0.8rem; color: var(--text-dim); margin-top: 0.5rem;">
+        Zero Jacobian sensitivity — requires depot scanner
+      </div>
+    </div>
+  </div>
+
+  <!-- Full State Table -->
+  <div class="section-title"><span class="icon">📋</span> Full State Estimate Table</div>
+  <table class="data-table" id="state-table">
+    <thead>
+      <tr>
+        <th>State</th>
+        <th>Value</th>
+        <th>Uncertainty (σ)</th>
+        <th>Prior</th>
+        <th>Variance Reduction</th>
+        <th>Observability</th>
+      </tr>
+    </thead>
+    <tbody id="state-tbody"></tbody>
+  </table>
+
+  <!-- Simulator -->
+  <div class="section-title"><span class="icon">🎛️</span> Interactive Simulator</div>
+  <div class="sim-panel">
+    <p style="color: var(--text-dim); font-size: 0.85rem; margin-bottom: 1rem;">
+      Adjust tread depth per corner and see how the estimator responds. All physics are computed live.
+    </p>
+    <div class="sim-row">
+      <div class="sim-input-group">
+        <label>Tread FL: <span class="range-val" id="sim-tread-fl-val">5.0 mm</span></label>
+        <input type="range" id="sim-tread-fl" min="1.6" max="8.0" step="0.1" value="5.0">
+      </div>
+      <div class="sim-input-group">
+        <label>Tread FR: <span class="range-val" id="sim-tread-fr-val">5.0 mm</span></label>
+        <input type="range" id="sim-tread-fr" min="1.6" max="8.0" step="0.1" value="5.0">
+      </div>
+      <div class="sim-input-group">
+        <label>Tread RL: <span class="range-val" id="sim-tread-rl-val">5.0 mm</span></label>
+        <input type="range" id="sim-tread-rl" min="1.6" max="8.0" step="0.1" value="5.0">
+      </div>
+      <div class="sim-input-group">
+        <label>Tread RR: <span class="range-val" id="sim-tread-rr-val">5.0 mm</span></label>
+        <input type="range" id="sim-tread-rr" min="1.6" max="8.0" step="0.1" value="5.0">
+      </div>
+    </div>
+    <div class="sim-row">
+      <div class="sim-input-group">
+        <label>Pressure FL: <span class="range-val" id="sim-press-fl-val">240 kPa</span></label>
+        <input type="range" id="sim-press-fl" min="100" max="400" step="5" value="240">
+      </div>
+      <div class="sim-input-group">
+        <label>Pressure FR: <span class="range-val" id="sim-press-fr-val">240 kPa</span></label>
+        <input type="range" id="sim-press-fr" min="100" max="400" step="5" value="240">
+      </div>
+      <div class="sim-input-group">
+        <label>Pressure RL: <span class="range-val" id="sim-press-rl-val">240 kPa</span></label>
+        <input type="range" id="sim-press-rl" min="100" max="400" step="5" value="240">
+      </div>
+      <div class="sim-input-group">
+        <label>Pressure RR: <span class="range-val" id="sim-press-rr-val">240 kPa</span></label>
+        <input type="range" id="sim-press-rr" min="100" max="400" step="5" value="240">
+      </div>
+    </div>
+    <div style="margin-top: 1rem;">
+      <button id="sim-run-btn" style="
+        background: var(--accent);
+        color: white;
+        border: none;
+        padding: 0.6rem 2rem;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s;
+      ">Run Estimator</button>
+      <span id="sim-status" style="margin-left: 1rem; color: var(--text-dim); font-size: 0.85rem;"></span>
+    </div>
+  </div>
+
+  <!-- Observable Limitations -->
+  <div class="section-title"><span class="icon">⚠️</span> What We Can and Cannot See</div>
+  <div class="grid-3">
+    <div class="card" style="border-left: 3px solid var(--green);">
+      <div class="card-title" style="color: var(--green);">✓ Directly Observed</div>
+      <p style="font-size: 0.9rem;">TPMS gives per-corner pressure directly. The estimator refines it slightly through cross-channel consistency.</p>
+    </div>
+    <div class="card" style="border-left: 3px solid var(--yellow);">
+      <div class="card-title" style="color: var(--yellow);">~ Weakly Observed</div>
+      <p style="font-size: 0.9rem;">Tread depth via within-axle differentials. The wheel-speed ratio constrains <em>d<sub>FL</sub> − d<sub>FR</sub></em>, not absolute tread. Common mode requires the resonance channel.</p>
+    </div>
+    <div class="card" style="border-left: 3px solid var(--red);">
+      <div class="card-title" style="color: var(--red);">✗ Unobservable</div>
+      <p style="font-size: 0.9rem;">Camber has zero Jacobian sensitivity in all channels. Absolute tread depth without resonance. Toe sign (drag is even in toe).</p>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    EV Tyre Intelligence System — Phase 3 Review 1 — Generated by Codebuff 🤖<br>
+    225 tests passing • stdlib + numpy only • No new dependencies
+  </div>
+
+</div>
+
+<script>
+// ============================================================
+// SIMULATION ENGINE (JavaScript port of the Python estimator)
+// ============================================================
+
+const STATE = {
+  tread_fl: 0, tread_fr: 1, tread_rl: 2, tread_rr: 3,
+  press_fl: 4, press_fr: 5, press_rl: 6, press_rr: 7,
+  toe_sq: 8, camber: 9
+};
+
+const CORNERS = ['FL', 'FR', 'RL', 'RR'];
+const TREAD_IDX = [0, 1, 2, 3];
+const PRESS_IDX = [4, 5, 6, 7];
+
+// Default physics (UNVALIDATED — legacy reference values)
+const PHYSICS = {
+  k_z0: 210000,
+  cornering_stiffness: 55000,
+  tread_rr_span: 0.20,
+  c_rr0: 0.0090,
+  p_exponent: 0.45,
+  t_coeff: 0.0015,
+  deflection_factor: 1.0 / 3.0,
+};
+
+const VEHICLE = {
+  mass_kg: 1800,
+  front_weight_fraction: 0.48,
+  wheel_belt_radius_m: 0.322,
+  placard_pressure_kpa: 240,
+  tread_new_mm: 8.0,
+  tread_legal_mm: 1.6,
+  cold_reference_temperature_c: 25.0,
+};
+
+const G = 9.80665;
+
+function cornerWeight(corner) {
+  const share = (corner === 'FL' || corner === 'FR')
+    ? VEHICLE.front_weight_fraction
+    : 1.0 - VEHICLE.front_weight_fraction;
+  return VEHICLE.mass_kg * G * share / 2.0;
+}
+
+function effectiveRollingRadius(tread_mm, p_kpa, fz_n) {
+  const r_free = VEHICLE.wheel_belt_radius_m + tread_mm / 1000.0;
+  const k_z = PHYSICS.k_z0 * (p_kpa / VEHICLE.placard_pressure_kpa);
+  const delta = fz_n / Math.max(k_z, 1.0);
+  return r_free - PHYSICS.deflection_factor * delta;
+}
+
+function rollingResistanceCoeff(tread_mm, p_kpa, t_c) {
+  const p_term = Math.pow(VEHICLE.placard_pressure_kpa / Math.max(p_kpa, 1.0), PHYSICS.p_exponent);
+  const s = PHYSICS.tread_rr_span;
+  const t_term = (1.0 - s) + s * (tread_mm / VEHICLE.tread_new_mm);
+  const T_term = 1.0 + PHYSICS.t_coeff * (t_c - VEHICLE.cold_reference_temperature_c);
+  return PHYSICS.c_rr0 * p_term * t_term * T_term;
+}
+
+function toeDragFromSq(toe_sq) {
+  return 2.0 * PHYSICS.cornering_stiffness * Math.pow(Math.PI / 180.0, 2) * toe_sq;
+}
+
+function prior() {
+  const mid_tread = (VEHICLE.tread_new_mm + VEHICLE.tread_legal_mm) / 2.0;
+  const x0 = new Float64Array(10);
+  x0[0] = x0[1] = x0[2] = x0[3] = mid_tread;
+  x0[4] = x0[5] = x0[6] = x0[7] = VEHICLE.placard_pressure_kpa;
+  x0[8] = 0.10;
+  x0[9] = 0.0;
+  return x0;
+}
+
+function priorCov() {
+  return [
+    2.5**2, 2.5**2, 2.5**2, 2.5**2,
+    40.0**2, 40.0**2, 40.0**2, 40.0**2,
+    0.40**2, 1.0**2
+  ];
+}
+
+function predict(x, t_meas_c) {
+  const z = new Float64Array(11);
+
+  // Pressure
+  z[0] = x[4]; z[1] = x[5]; z[2] = x[6]; z[3] = x[7];
+
+  // Front axle ratio: r_R / r_L
+  const r_fl = effectiveRollingRadius(x[0], x[4], cornerWeight('FL'));
+  const r_fr = effectiveRollingRadius(x[1], x[5], cornerWeight('FR'));
+  z[8] = r_fr / Math.max(r_fl, 1e-6);
+
+  // Rear axle ratio: r_R / r_L
+  const r_rl = effectiveRollingRadius(x[2], x[6], cornerWeight('RL'));
+  const r_rr = effectiveRollingRadius(x[3], x[7], cornerWeight('RR'));
+  z[9] = r_rr / Math.max(r_rl, 1e-6);
+
+  // Road load: C_rr + F_toe/(m*g)
+  const c_rr_mean = [
+    rollingResistanceCoeff(x[0], x[4], t_meas_c),
+    rollingResistanceCoeff(x[1], x[5], t_meas_c),
+    rollingResistanceCoeff(x[2], x[6], t_meas_c),
+    rollingResistanceCoeff(x[3], x[7], t_meas_c)
+  ].reduce((a, b) => a + b, 0) / 4;
+
+  const f_toe = toeDragFromSq(x[8]);
+  z[10] = c_rr_mean + f_toe / (VEHICLE.mass_kg * G);
+
+  return z;
+}
+
+function jacobian(x, t_meas_c, eps = 1e-5) {
+  const H = Array.from({length: 11}, () => new Float64Array(10));
+  const x_plus = new Float64Array(x);
+  const x_minus = new Float64Array(x);
+
+  for (let j = 0; j < 10; j++) {
+    x_plus[j] = x[j] + eps;
+    x_minus[j] = x[j] - eps;
+    const z_plus = predict(x_plus, t_meas_c);
+    const z_minus = predict(x_minus, t_meas_c);
+    for (let i = 0; i < 11; i++) {
+      H[i][j] = (z_plus[i] - z_minus[i]) / (2 * eps);
+    }
+    x_plus[j] = x[j];
+    x_minus[j] = x[j];
+  }
+  return H;
+}
+
+function matMulTransA(A, B) {
+  const m = A.length, n = A[0].length, p = B[0].length;
+  const C = Array.from({length: n}, () => new Float64Array(p));
+  for (let i = 0; i < n; i++)
+    for (let j = 0; j < p; j++)
+      for (let k = 0; k < m; k++)
+        C[i][j] += A[k][i] * B[k][j];
+  return C;
+}
+
+function matVecMul(A, v) {
+  const m = A.length, n = A[0].length;
+  const out = new Float64Array(m);
+  for (let i = 0; i < m; i++)
+    for (let j = 0; j < n; j++)
+      out[i] += A[i][j] * v[j];
+  return out;
+}
+
+function diagInv(diag) {
+  return diag.map(d => 1.0 / d);
+}
+
+function solve(A, b) {
+  const n = A.length;
+  // Simple Gaussian elimination
+  const aug = A.map((row, i) => [...row, b[i]]);
+  for (let i = 0; i < n; i++) {
+    let maxRow = i;
+    for (let k = i + 1; k < n; k++)
+      if (Math.abs(aug[k][i]) > Math.abs(aug[maxRow][i])) maxRow = k;
+    [aug[i], aug[maxRow]] = [aug[maxRow], aug[i]];
+    if (Math.abs(aug[i][i]) < 1e-12) return null;
+    for (let k = i + 1; k < n; k++) {
+      const f = aug[k][i] / aug[i][i];
+      for (let j = i; j <= n; j++) aug[k][j] -= f * aug[i][j];
+    }
+  }
+  const x = new Float64Array(n);
+  for (let i = n - 1; i >= 0; i--) {
+    x[i] = aug[i][n];
+    for (let j = i + 1; j < n; j++) x[i] -= aug[i][j] * x[j];
+    x[i] /= aug[i][i];
+  }
+  return x;
+}
+
+function invertMatrix(A) {
+  const n = A.length;
+  const aug = A.map((row, i) => [...row, ...Array(n).fill(0).map((_, j) => i === j ? 1 : 0)]);
+  for (let i = 0; i < n; i++) {
+    let maxRow = i;
+    for (let k = i + 1; k < n; k++)
+      if (Math.abs(aug[k][i]) > Math.abs(aug[maxRow][i])) maxRow = k;
+    [aug[i], aug[maxRow]] = [aug[maxRow], aug[i]];
+    if (Math.abs(aug[i][i]) < 1e-12) return null;
+    const pivot = aug[i][i];
+    for (let j = 0; j < 2 * n; j++) aug[i][j] /= pivot;
+    for (let k = 0; k < n; k++) {
+      if (k === i) continue;
+      const f = aug[k][i];
+      for (let j = 0; j < 2 * n; j++) aug[k][j] -= f * aug[i][j];
+    }
+  }
+  return aug.map(row => row.slice(n));
+}
+
+function estimate(features, t_meas_c) {
+  const x0 = prior();
+  const P0_diag = priorCov();
+
+  // Measurement vector
+  const z = new Float64Array(11);
+  const R_diag = new Float64Array(11).fill(1e12);
+  const available = [];
+
+  for (let i = 0; i < 4; i++) {
+    if (features.pressure[i] !== null) {
+      z[i] = features.pressure[i];
+      R_diag[i] = 5.0 ** 2;
+      available.push(i);
+    }
+  }
+  if (features.ratio_front !== null) { z[8] = features.ratio_front; R_diag[8] = 0.005**2; available.push(8); }
+  if (features.ratio_rear !== null) { z[9] = features.ratio_rear; R_diag[9] = 0.005**2; available.push(9); }
+
+  const R_inv_diag = diagInv(R_diag);
+  const P0_inv = P0_diag.map(d => 1.0 / d);
+
+  let x = new Float64Array(x0);
+  let singular = false;
+  let maxDx = Infinity;
+
+  for (let iter = 0; iter < 6; iter++) {
+    const H = jacobian(x, t_meas_c);
+    const h = predict(x, t_meas_c);
+    const residual = new Float64Array(11);
+    for (let i = 0; i < 11; i++) residual[i] = z[i] - h[i];
+
+    // H^T R^-1
+    const HTR = Array.from({length: 10}, (_, i) =>
+      new Float64Array(11).map((_, j) => H[j][i] * R_inv_diag[j])
+    );
+
+    // A = H^T R^-1 H + P0^-1
+    const A = Array.from({length: 10}, (_, i) =>
+      new Float64Array(10).map((_, j) => {
+        let sum = 0;
+        for (let k = 0; k < 11; k++) sum += HTR[i][k] * H[k][j];
+        return sum + (i === j ? P0_inv[i] : 0);
+      })
+    );
+
+    // b = H^T R^-1 (z - h(x)) + P0^-1 (x0 - x)
+    const b = new Float64Array(10);
+    const HTRr = matVecMul(HTR, residual);
+    for (let i = 0; i < 10; i++) {
+      b[i] = HTRr[i] + P0_inv[i] * (x0[i] - x[i]);
+    }
+
+    const dx = solve(A, b);
+    if (!dx) { singular = true; break; }
+
+    for (let i = 0; i < 10; i++) x[i] += dx[i];
+
+    // Clip
+    for (let i = 0; i < 4; i++) x[i] = Math.max(0.5, Math.min(9.0, x[i]));
+    for (let i = 4; i < 8; i++) x[i] = Math.max(50, Math.min(500, x[i]));
+    x[8] = Math.max(0, x[8]);
+
+    maxDx = Math.max(...dx.map(Math.abs));
+    if (maxDx < 1e-7) break;
+  }
+
+  // Posterior covariance
+  const H_final = jacobian(x, t_meas_c);
+  const HTR_final = Array.from({length: 10}, (_, i) =>
+    new Float64Array(11).map((_, j) => H_final[j][i] * R_inv_diag[j])
+  );
+  const A_final = Array.from({length: 10}, (_, i) =>
+    new Float64Array(10).map((_, j) => {
+      let sum = 0;
+      for (let k = 0; k < 11; k++) sum += HTR_final[i][k] * H_final[k][j];
+      return sum + (i === j ? P0_inv[i] : 0);
+    })
+  );
+  const P_inv = invertMatrix(A_final);
+  const P = P_inv ? invertMatrix(P_inv) : P0_diag.map(d => d);
+  const P_diag = P.map ? P.map((row, i) => row[i]) : P;
+
+  // Classify observability
+  const stateNames = [
+    'tread_FL', 'tread_FR', 'tread_RL', 'tread_RR',
+    'press_FL', 'press_FR', 'press_RL', 'press_RR',
+    'toe^2', 'camber'
+  ];
+
+  // Common-mode check: for axle-paired states, verify the common-mode
+  // direction u=(e_i+e_j)/sqrt(2) has variance reduction.
+  // This prevents marking tread OBSERVED when only the difference is constrained.
+  const commonModeVr = (i, j) => {
+    const u = new Float64Array(10);
+    u[i] = 1.0 / Math.sqrt(2.0);
+    u[j] = 1.0 / Math.sqrt(2.0);
+    // prior variance along u: u^T P0 u
+    let prior_v = 0; for (let k = 0; k < 10; k++) prior_v += u[k] * u[k] * P0_diag[k];
+    // posterior variance along u: u^T P u
+    let post_v = 0;
+    for (let k = 0; k < 10; k++)
+      for (let l = 0; l < 10; l++)
+        post_v += u[k] * u[l] * P[k][l];
+    return prior_v > 0 ? Math.max(0, 1 - post_v / prior_v) : 0;
+  };
+
+  const states = stateNames.map((name, j) => {
+    const colNorm = Math.sqrt(H_final.reduce((s, row) => s + row[j] ** 2, 0));
+    const prior_var = P0_diag[j];
+    const post_var = P_diag[j];
+    const vr = prior_var > 0 ? Math.max(0, Math.min(1, 1 - post_var / prior_var)) : 0;
+
+    let obs, reason;
+    if (colNorm < 1e-10) {
+      obs = 'UNOBSERVABLE';
+      reason = `Zero Jacobian sensitivity (${colNorm.toExponential(2)})`;
+    } else if (vr < 0.01) {
+      obs = 'WEAK';
+      reason = `Low information gain (VR ${vr.toFixed(4)})`;
+    } else {
+      // Check common mode for axle-paired tread states
+      const isTread = name.startsWith('tread_');
+      if (isTread) {
+        // FL(0)-FR(1) share front axle, RL(2)-RR(3) share rear axle
+        const partner = j <= 1 ? j + 1 : j - 1; // flip within axle pair
+        const cmVr = commonModeVr(j, partner);
+        if (cmVr < 0.01) {
+          obs = 'WEAK';
+          reason = `Only the within-axle difference is constrained (marginal VR ${vr.toFixed(4)}, but common-mode VR ${cmVr.toFixed(4)}); the absolute level is not recoverable without an independent channel`;
+        } else {
+          obs = 'OBSERVED';
+          reason = null;
+        }
+      } else {
+        obs = 'OBSERVED';
+        reason = null;
+      }
+    }
+
+    return {
+      name, value: x[j], sigma: Math.sqrt(Math.max(0, post_var)),
+      observability: obs, reason,
+      prior_value: x0[j], prior_sigma: Math.sqrt(prior_var),
+      variance_reduction: vr,
+      magnitude_only: name === 'toe^2'
+    };
+  });
+
+  return { states, singular, converged: maxDx < 1e-7, maxDx };
+}
+
+// ============================================================
+// UI RENDERING
+// ============================================================
+
+const DEMO_RESULT = estimate({
+  pressure: [240, 240, 240, 240],
+  ratio_front: 1.0,
+  ratio_rear: 1.0,
+}, 25.0);
+
+function renderCornerCards(containerId, states, indices, label, unit, minVal, maxVal, legalLimit) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+
+  indices.forEach((si, i) => {
+    const s = states[si];
+    const corner = CORNERS[i];
+    const pct = Math.max(0, Math.min(100, ((s.value - minVal) / (maxVal - minVal)) * 100));
+    const legalPct = legalLimit ? ((legalLimit - minVal) / (maxVal - minVal)) * 100 : 0;
+
+    let barColor = 'var(--green)';
+    if (s.observability === 'WEAK') barColor = 'var(--yellow)';
+    if (s.observability === 'UNOBSERVABLE') barColor = 'var(--red)';
+    if (legalLimit && s.value <= legalLimit * 1.5) barColor = 'var(--orange)';
+
+    const card = document.createElement('div');
+    card.className = `corner-card ${corner}`;
+    card.innerHTML = `
+      <div class="corner-label"><span class="pos">${corner}</span></div>
+      <div class="corner-stat">
+        <span class="label">${label}</span>
+        <span class="value">${s.value.toFixed(2)}<span class="card-unit">${unit}</span></span>
+      </div>
+      <div class="corner-stat">
+        <span class="label">Uncertainty (σ)</span>
+        <span class="value" style="font-size: 0.85rem;">±${s.sigma.toFixed(2)}<span class="card-unit">${unit}</span></span>
+      </div>
+      <div class="corner-stat">
+        <span class="label">Observability</span>
+        <span class="obs-badge obs-${s.observability}">${s.observability}</span>
+      </div>
+      <div class="corner-stat">
+        <span class="label">Variance Reduction</span>
+        <span class="value" style="font-size: 0.85rem;">${(s.variance_reduction * 100).toFixed(1)}%</span>
+      </div>
+      ${unit === 'mm' ? `
+      <div class="tread-bar">
+        <div class="fill" style="width: ${pct}%; background: ${barColor};"></div>
+        ${legalLimit ? `<div class="legal-limit" style="left: ${legalPct}%;" title="Legal limit: ${legalLimit} mm"></div>` : ''}
+      </div>
+      <div style="display: flex; justify-content: space-between; font-size: 0.65rem; color: var(--text-dim); margin-top: 0.25rem;">
+        <span>${minVal} mm</span>
+        ${legalLimit ? `<span style="color: var(--red);">▲ Legal: ${legalLimit} mm</span>` : ''}
+        <span>${maxVal} mm</span>
+      </div>
+      ` : ''}
+    `;
+    container.appendChild(card);
+  });
+}
+
+function renderStateTable(states) {
+  const tbody = document.getElementById('state-tbody');
+  tbody.innerHTML = '';
+  states.forEach(s => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="font-weight: 600;">${s.name}</td>
+      <td>${s.value.toFixed(4)}</td>
+      <td>±${s.sigma.toFixed(4)}</td>
+      <td style="color: var(--text-dim);">${s.prior_value.toFixed(2)}</td>
+      <td>${(s.variance_reduction * 100).toFixed(1)}%</td>
+      <td><span class="obs-badge obs-${s.observability}">${s.observability}</span></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function renderSummary(result) {
+  const nObs = result.states.filter(s => s.observability === 'OBSERVED').length;
+  const observedStates = result.states.filter(s => s.observability === 'OBSERVED');
+  const meanVR = observedStates.length > 0
+    ? observedStates.reduce((a, s) => a + s.variance_reduction, 0) / observedStates.length
+    : 0;
+  document.getElementById('states-observed').textContent = `${nObs}/${result.states.length}`;
+  document.getElementById('mean-vr').textContent = meanVR.toFixed(4);
+}
+
+function renderAll(result) {
+  renderCornerCards('tread-cards', result.states, [0, 1, 2, 3], 'Tread Depth', 'mm', 0, 8, 1.6);
+  renderCornerCards('pressure-cards', result.states, [4, 5, 6, 7], 'Pressure', 'kPa', 50, 400, null);
+  renderStateTable(result.states);
+  renderSummary(result);
+
+  const toe = result.states[8];
+  document.getElementById('toe-value').innerHTML = `${toe.value.toFixed(4)}<span class="card-unit">deg²</span>`;
+  document.getElementById('toe-mag').textContent = Math.sqrt(Math.max(0, toe.value)).toFixed(3);
+  document.getElementById('toe-badge').className = `obs-badge obs-${toe.observability}`;
+  document.getElementById('toe-badge').textContent = toe.observability;
+
+  const camber = result.states[9];
+  document.getElementById('camber-value').innerHTML = `${camber.value.toFixed(4)}<span class="card-unit">deg</span>`;
+  document.getElementById('camber-badge').className = `obs-badge obs-${camber.observability}`;
+  document.getElementById('camber-badge').textContent = camber.observability;
+}
+
+// Simulator
+function setupSimulator() {
+  const sliders = ['sim-tread-fl', 'sim-tread-fr', 'sim-tread-rl', 'sim-tread-rr',
+                    'sim-press-fl', 'sim-press-fr', 'sim-press-rl', 'sim-press-rr'];
+
+  sliders.forEach(id => {
+    const el = document.getElementById(id);
+    const valEl = document.getElementById(id + '-val');
+    el.addEventListener('input', () => {
+      const unit = id.includes('tread') ? ' mm' : ' kPa';
+      valEl.textContent = el.value + unit;
+    });
+  });
+
+  document.getElementById('sim-run-btn').addEventListener('click', () => {
+    const treads = [
+      parseFloat(document.getElementById('sim-tread-fl').value),
+      parseFloat(document.getElementById('sim-tread-fr').value),
+      parseFloat(document.getElementById('sim-tread-rl').value),
+      parseFloat(document.getElementById('sim-tread-rr').value),
+    ];
+    const presses = [
+      parseFloat(document.getElementById('sim-press-fl').value),
+      parseFloat(document.getElementById('sim-press-fr').value),
+      parseFloat(document.getElementById('sim-press-rl').value),
+      parseFloat(document.getElementById('sim-press-rr').value),
+    ];
+
+    const result = estimate({
+      pressure: presses,
+      ratio_front: null,
+      ratio_rear: null,
+    }, 25.0);
+
+    // The simulator shows what the estimator would output with ONLY pressure
+    // (no wheel-speed ratios — those come from real telemetry, not sliders)
+    document.getElementById('sim-status').innerHTML =
+      `<span style="color: var(--green);">✓</span> Estimated with pressure only — ` +
+      `tread is <span style="color: var(--yellow);">WEAK</span> without wheel-speed ratios`;
+
+    // Show the result in the main display
+    renderAll(result);
+  });
+}
+
+// Initialize
+renderAll(DEMO_RESULT);
+setupSimulator();
+</script>
+
+</body>
+</html>

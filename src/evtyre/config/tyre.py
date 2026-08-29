@@ -25,6 +25,7 @@ class TyreConfig:
     tread_new_mm: float
     tread_legal_mm: float
     placard_pressure_kpa: float
+    cold_reference_temperature_c: float
 
     def __post_init__(self) -> None:
         if not self.tyre_model_id:
@@ -37,3 +38,5 @@ class TyreConfig:
             raise ValueError("tread_new_mm must be greater than tread_legal_mm")
         if self.placard_pressure_kpa <= 0:
             raise ValueError("placard_pressure_kpa must be positive")
+        if self.cold_reference_temperature_c < -40 or self.cold_reference_temperature_c > 80:
+            raise ValueError("cold_reference_temperature_c must be between -40 and 80")
