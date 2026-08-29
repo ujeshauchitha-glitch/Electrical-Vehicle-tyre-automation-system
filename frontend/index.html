@@ -1,112 +1,666 @@
 <!DOCTYPE html>
-<html lang="en">
+<html class="dark" lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EV Tyre Intelligence Dashboard</title>
-    <link rel="stylesheet" href="styles.css">
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>EV Tyre Intelligence Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&amp;family=Geist:wght@400;500&amp;family=JetBrains+Mono:wght@500;700&amp;display=swap" rel="stylesheet">
+<script>
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+          "outline-variant": "#4f453e",
+          "surface": "#200c1f",
+          "surface-container-highest": "#452d41",
+          "surface-container-high": "#392236",
+          "background": "#200c1f",
+          "surface-container-lowest": "#1a0719",
+          "secondary": "#ffb2bf",
+          "outline": "#9b8e86",
+          "error": "#ffb4ab",
+          "on-surface-variant": "#d2c4bb",
+          "primary-container": "#fad9c1",
+          "on-surface": "#fcd8f3",
+          "surface-container-low": "#291427",
+          "surface-bright": "#493146",
+          "surface-variant": "#452d41",
+          "on-primary": "#402c1c",
+          "surface-container": "#2e182b",
+          "on-secondary-container": "#ff9caf",
+          "primary": "#fffaff",
+        },
+        "borderRadius": {
+          "DEFAULT": "0.125rem",
+          "lg": "0.25rem",
+          "xl": "0.5rem",
+          "full": "0.75rem"
+        },
+        "spacing": {
+          "base": "4px",
+          "margin-mobile": "16px",
+          "gutter": "20px",
+          "margin-desktop": "32px",
+        },
+        "fontFamily": {
+          "display-lg": ["Space Grotesk"],
+          "title-md": ["Geist"],
+          "label-caps": ["JetBrains Mono"],
+          "headline-lg": ["Space Grotesk"],
+          "body-lg": ["Geist"],
+          "body-sm": ["Geist"],
+          "data-mono": ["JetBrains Mono"]
+        },
+        "fontSize": {
+          "display-lg": ["48px", { lineHeight: "56px", letterSpacing: "-0.02em", fontWeight: "700" }],
+          "title-md": ["20px", { lineHeight: "28px", fontWeight: "500" }],
+          "label-caps": ["12px", { lineHeight: "16px", letterSpacing: "0.08em", fontWeight: "500" }],
+          "headline-lg": ["32px", { lineHeight: "40px", fontWeight: "600" }],
+          "body-lg": ["16px", { lineHeight: "24px", fontWeight: "400" }],
+          "body-sm": ["14px", { lineHeight: "20px", fontWeight: "400" }],
+          "data-mono": ["18px", { lineHeight: "24px", fontWeight: "700" }]
+        }
+      },
+    },
+  }
+</script>
+<style>
+  body {
+    background-color: #200c1f;
+    color: #fcd8f3;
+    font-family: 'Geist', sans-serif;
+  }
+  .hud-panel {
+    background-color: #2e182b;
+    border: 1px solid #4f453e;
+    border-radius: 0.5rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .hud-panel::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, #fad9c1, transparent);
+    opacity: 0.3;
+  }
+  .text-glow { text-shadow: 0 0 10px rgba(250, 217, 193, 0.3); }
+  .metric-value {
+    color: #fad9c1;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: #291427; }
+  ::-webkit-scrollbar-thumb { background: #4f453e; border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: #fad9c1; }
+  .loading-pulse { animation: pulse 1.5s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+</style>
 </head>
-<body>
-    <header>
-        <h1>EV Tyre Intelligence</h1>
-        <p class="subtitle">Tyre state estimation from existing vehicle CAN signals</p>
+<body class="antialiased min-h-screen flex flex-col pt-16 pb-16">
+
+<!-- TopNavBar -->
+<nav class="bg-surface/80 backdrop-blur-xl flex justify-between items-center px-margin-desktop h-16 w-full fixed top-0 z-50 border-b border-outline-variant/30 shadow-sm">
+  <div class="font-display-lg text-display-lg font-bold tracking-tighter text-primary" style="font-size:24px;line-height:24px;">TYRE_INTEL_EV</div>
+  <div class="hidden md:flex items-center space-x-8">
+    <a class="text-primary border-b-2 border-primary pb-1 font-title-md text-title-md transition-colors" href="#">Dashboard</a>
+    <a class="text-on-surface-variant hover:text-on-surface transition-colors font-title-md text-title-md p-1 rounded" href="#">Pipeline</a>
+    <a class="text-on-surface-variant hover:text-on-surface transition-colors font-title-md text-title-md p-1 rounded" href="#">Observability</a>
+    <a class="text-on-surface-variant hover:text-on-surface transition-colors font-title-md text-title-md p-1 rounded" href="#">Simulator</a>
+  </div>
+  <div class="flex items-center space-x-4">
+    <button class="text-primary hover:bg-surface-container-high/50 p-2 rounded transition-colors">
+      <span class="material-symbols-outlined">settings</span>
+    </button>
+    <button class="text-primary hover:bg-surface-container-high/50 p-2 rounded transition-colors">
+      <span class="material-symbols-outlined">notifications</span>
+    </button>
+    <button id="status-badge" class="bg-primary-container font-label-caps text-label-caps px-4 py-2 rounded-lg font-bold hover:bg-surface-tint transition-colors text-on-primary">
+      Estimator Online
+    </button>
+  </div>
+</nav>
+
+<div class="flex-1 flex overflow-hidden w-full">
+
+<!-- SideNavBar -->
+<aside class="bg-surface border-r border-outline-variant/30 hidden lg:flex flex-col h-screen w-64 flex-shrink-0 z-40 fixed left-0 top-0 p-4 space-y-2">
+  <div class="p-4 border-b border-outline-variant/30 mb-4">
+    <div class="flex items-center space-x-3">
+      <div class="w-10 h-10 rounded-lg bg-surface-container-highest flex items-center justify-center border border-outline-variant">
+        <span class="material-symbols-outlined text-primary">memory</span>
+      </div>
+      <div>
+        <div class="font-label-caps text-label-caps text-on-surface font-bold">Core Systems</div>
+        <div class="text-xs text-on-surface-variant font-data-mono">v0.1.0</div>
+      </div>
+    </div>
+  </div>
+  <div class="flex-1 overflow-y-auto space-y-1">
+    <a class="flex items-center space-x-3 px-3 py-2 bg-surface-container-high text-on-surface rounded-lg font-label-caps text-label-caps font-bold transition-all" href="#">
+      <span class="material-symbols-outlined">query_stats</span>
+      <span>Telemetry</span>
+    </a>
+    <a class="flex items-center space-x-3 px-3 py-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest rounded-lg transition-all font-label-caps text-label-caps" href="#">
+      <span class="material-symbols-outlined">precision_manufacturing</span>
+      <span>Diagnostics</span>
+    </a>
+    <a class="flex items-center space-x-3 px-3 py-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest rounded-lg transition-all font-label-caps text-label-caps" href="#">
+      <span class="material-symbols-outlined">insights</span>
+      <span>Analysis</span>
+    </a>
+    <a class="flex items-center space-x-3 px-3 py-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest rounded-lg transition-all font-label-caps text-label-caps" href="#">
+      <span class="material-symbols-outlined">terminal</span>
+      <span>Logs</span>
+    </a>
+  </div>
+  <div class="mt-auto border-t border-outline-variant/30 pt-4 space-y-1">
+    <button id="export-btn" class="w-full py-2 bg-surface-container-highest text-primary rounded-lg font-label-caps text-label-caps font-bold hover:bg-surface-bright transition-colors mb-4 border border-outline-variant">
+      Export Data
+    </button>
+    <a class="flex items-center space-x-3 px-3 py-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest rounded-lg transition-all font-label-caps text-label-caps" href="http://localhost:8000/docs" target="_blank">
+      <span class="material-symbols-outlined">code</span>
+      <span>API Docs</span>
+    </a>
+  </div>
+</aside>
+
+<!-- Main Content Canvas -->
+<main class="flex-1 overflow-y-auto p-gutter md:p-margin-desktop bg-background lg:ml-64 w-full">
+  <div class="max-w-7xl mx-auto space-y-6">
+
+    <!-- Hero Section -->
+    <header class="hud-panel p-6 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+      <div>
+        <h1 class="font-headline-lg text-headline-lg text-on-surface mb-2 tracking-tight">Vehicle telemetry transformed into tyre intelligence</h1>
+        <p class="font-body-lg text-body-lg text-on-surface-variant max-w-2xl">Real-time virtual sensing and state estimation pipeline for advanced EV dynamics.</p>
+      </div>
+      <div class="flex space-x-3">
+        <div class="px-3 py-2 bg-surface-container-high rounded-lg border border-outline-variant flex items-center space-x-2">
+          <span id="status-dot" class="w-2 h-2 rounded-full bg-primary-container animate-pulse"></span>
+          <span id="status-text" class="font-data-mono text-[14px] text-on-surface-variant">Connecting...</span>
+        </div>
+        <div class="px-3 py-2 bg-surface-container-high rounded-lg border border-outline-variant flex items-center space-x-2">
+          <span class="material-symbols-outlined text-[16px] text-primary">functions</span>
+          <span class="font-data-mono text-[14px] text-on-surface-variant">Gauss-Newton MAP</span>
+        </div>
+      </div>
     </header>
 
-    <main>
-        <!-- Left panel: Inputs -->
-        <section class="panel input-panel">
-            <h2>Telemetry Input</h2>
+    <!-- KPI Grid -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="hud-panel p-4 bg-surface-container-low flex flex-col justify-between h-32">
+        <div class="flex justify-between items-center text-on-surface-variant font-label-caps text-label-caps text-primary-container">
+          <span>Tread MAE</span>
+          <span class="material-symbols-outlined text-[18px]">straighten</span>
+        </div>
+        <div id="kpi-tread" class="font-data-mono text-data-mono metric-value">—<span class="text-sm text-on-surface-variant ml-1">mm</span></div>
+      </div>
+      <div class="hud-panel p-4 bg-surface-container-low flex flex-col justify-between h-32">
+        <div class="flex justify-between items-center text-on-surface-variant font-label-caps text-label-caps text-primary-container">
+          <span>Pressure MAE</span>
+          <span class="material-symbols-outlined text-[18px]">compress</span>
+        </div>
+        <div id="kpi-pressure" class="font-data-mono text-data-mono metric-value">—<span class="text-sm text-on-surface-variant ml-1">kPa</span></div>
+      </div>
+      <div class="hud-panel p-4 bg-surface-container-low flex flex-col justify-between h-32">
+        <div class="flex justify-between items-center text-on-surface-variant font-label-caps text-label-caps text-primary-container">
+          <span>Convergence</span>
+          <span class="material-symbols-outlined text-[18px]">model_training</span>
+        </div>
+        <div id="kpi-convergence" class="font-data-mono text-data-mono metric-value">—<span class="text-sm text-on-surface-variant ml-1">iter</span></div>
+      </div>
+      <div class="hud-panel p-4 bg-surface-container-low flex flex-col justify-between h-32">
+        <div class="flex justify-between items-center text-on-surface-variant font-label-caps text-label-caps text-primary-container">
+          <span>Recoverable Energy</span>
+          <span class="material-symbols-outlined text-[18px]">bolt</span>
+        </div>
+        <div id="kpi-energy" class="font-data-mono text-data-mono metric-value">—<span class="text-sm text-on-surface-variant ml-1">%</span></div>
+      </div>
+    </div>
 
-            <div class="input-group">
-                <h3>Tyre Pressure (kPa)</h3>
-                <div class="slider-row">
-                    <label>FL: <span id="val-pfl">240</span></label>
-                    <input type="range" id="pfl" min="150" max="320" value="240" step="5">
-                </div>
-                <div class="slider-row">
-                    <label>FR: <span id="val-pfr">240</span></label>
-                    <input type="range" id="pfr" min="150" max="320" value="240" step="5">
-                </div>
-                <div class="slider-row">
-                    <label>RL: <span id="val-prl">240</span></label>
-                    <input type="range" id="prl" min="150" max="320" value="240" step="5">
-                </div>
-                <div class="slider-row">
-                    <label>RR: <span id="val-prr">240</span></label>
-                    <input type="range" id="prr" min="150" max="320" value="240" step="5">
-                </div>
+    <!-- Live Tyre State & Physics Pipeline Bento -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+      <!-- Live Tyre State (Spans 2 cols) -->
+      <div class="lg:col-span-2 hud-panel p-6 flex flex-col">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider mb-0">Live Tyre State Estimation</h2>
+          <div class="flex items-center bg-surface-container-highest p-1 rounded-lg border border-outline-variant">
+            <button class="px-3 py-1 text-xs font-label-caps rounded-md bg-primary-container transition-colors font-bold text-on-primary" id="btn-metric" onclick="setUnits('metric')">Metric</button>
+            <button class="px-3 py-1 text-xs font-label-caps rounded-md text-on-surface-variant hover:text-on-surface transition-colors" id="btn-imperial" onclick="setUnits('imperial')">Imperial</button>
+          </div>
+        </div>
+        <div class="flex-1 relative flex items-center justify-center min-h-[400px]">
+          <!-- Car Silhouette -->
+          <div class="absolute inset-0 flex items-center justify-center p-12 pointer-events-none">
+            <svg viewBox="0 0 200 400" class="h-full w-auto object-contain opacity-30" fill="none" stroke="#fad9c1" stroke-width="1.5">
+              <rect x="50" y="40" width="100" height="320" rx="30" />
+              <rect x="30" y="100" width="140" height="180" rx="15" />
+              <circle cx="45" cy="90" r="18" />
+              <circle cx="155" cy="90" r="18" />
+              <circle cx="45" cy="310" r="18" />
+              <circle cx="155" cy="310" r="18" />
+              <line x1="60" y1="160" x2="140" y2="160" stroke-dasharray="4 4" />
+              <line x1="60" y1="240" x2="140" y2="240" stroke-dasharray="4 4" />
+            </svg>
+          </div>
+          <!-- FL Card -->
+          <div id="card-fl" class="absolute top-10 left-10 w-48 bg-surface-container-high rounded-lg p-3 border-l-2 border-l-primary-container z-10 shadow-lg">
+            <div class="font-label-caps text-[10px] text-on-surface-variant mb-2">Front Left (FL)</div>
+            <div class="grid grid-cols-2 gap-2 font-data-mono text-[14px]">
+              <div class="text-on-surface-variant">Tread:</div><div class="text-primary-container text-right"><span class="tread-val" data-metric="—">—</span> <span class="tread-unit text-[10px]">mm</span></div>
+              <div class="text-on-surface-variant">Press:</div><div class="text-primary-container text-right"><span class="press-val" data-metric="—">—</span> <span class="press-unit text-[10px]">kPa</span></div>
+              <div class="text-on-surface-variant">σ:</div><div class="text-on-surface-variant text-right"><span class="sigma-val">—</span></div>
             </div>
-
-            <div class="input-group">
-                <h3>Wheel-Speed Ratio</h3>
-                <div class="slider-row">
-                    <label>Front: <span id="val-rf">1.000</span></label>
-                    <input type="range" id="rf" min="0.980" max="1.020" value="1.000" step="0.001">
-                </div>
-                <div class="slider-row">
-                    <label>Rear: <span id="val-rr">1.000</span></label>
-                    <input type="range" id="rr" min="0.980" max="1.020" value="1.000" step="0.001">
-                </div>
+          </div>
+          <!-- FR Card -->
+          <div id="card-fr" class="absolute top-10 right-10 w-48 bg-surface-container-high rounded-lg p-3 border-l-2 border-l-primary-container z-10 shadow-lg">
+            <div class="font-label-caps text-[10px] text-on-surface-variant mb-2">Front Right (FR)</div>
+            <div class="grid grid-cols-2 gap-2 font-data-mono text-[14px]">
+              <div class="text-on-surface-variant">Tread:</div><div class="text-primary-container text-right"><span class="tread-val" data-metric="—">—</span> <span class="tread-unit text-[10px]">mm</span></div>
+              <div class="text-on-surface-variant">Press:</div><div class="text-primary-container text-right"><span class="press-val" data-metric="—">—</span> <span class="press-unit text-[10px]">kPa</span></div>
+              <div class="text-on-surface-variant">σ:</div><div class="text-on-surface-variant text-right"><span class="sigma-val">—</span></div>
             </div>
-
-            <div class="input-group">
-                <h3>Temperature</h3>
-                <div class="slider-row">
-                    <label>&deg;C: <span id="val-temp">25</span></label>
-                    <input type="range" id="temp" min="0" max="60" value="25" step="1">
-                </div>
+          </div>
+          <!-- RL Card -->
+          <div id="card-rl" class="absolute bottom-10 left-10 w-48 bg-surface-container-high rounded-lg p-3 border-l-2 border-l-primary-container z-10 shadow-lg">
+            <div class="font-label-caps text-[10px] text-on-surface-variant mb-2">Rear Left (RL)</div>
+            <div class="grid grid-cols-2 gap-2 font-data-mono text-[14px]">
+              <div class="text-on-surface-variant">Tread:</div><div class="text-primary-container text-right"><span class="tread-val" data-metric="—">—</span> <span class="tread-unit text-[10px]">mm</span></div>
+              <div class="text-on-surface-variant">Press:</div><div class="text-primary-container text-right"><span class="press-val" data-metric="—">—</span> <span class="press-unit text-[10px]">kPa</span></div>
+              <div class="text-on-surface-variant">σ:</div><div class="text-on-surface-variant text-right"><span class="sigma-val">—</span></div>
             </div>
-
-            <div class="button-row">
-                <button id="run-btn" class="btn primary">Run Estimator</button>
-                <button id="sim-btn" class="btn secondary">Random Simulation</button>
+          </div>
+          <!-- RR Card -->
+          <div id="card-rr" class="absolute bottom-10 right-10 w-48 bg-surface-container-high rounded-lg p-3 border-l-2 border-l-primary-container z-10 shadow-lg">
+            <div class="font-label-caps text-[10px] text-on-surface-variant mb-2">Rear Right (RR)</div>
+            <div class="grid grid-cols-2 gap-2 font-data-mono text-[14px]">
+              <div class="text-on-surface-variant">Tread:</div><div class="text-primary-container text-right"><span class="tread-val" data-metric="—">—</span> <span class="tread-unit text-[10px]">mm</span></div>
+              <div class="text-on-surface-variant">Press:</div><div class="text-primary-container text-right"><span class="press-val" data-metric="—">—</span> <span class="press-unit text-[10px]">kPa</span></div>
+              <div class="text-on-surface-variant">σ:</div><div class="text-on-surface-variant text-right"><span class="sigma-val">—</span></div>
             </div>
-        </section>
+          </div>
+        </div>
+      </div>
 
-        <!-- Right panel: Results -->
-        <section class="panel result-panel">
-            <h2>Estimation Results</h2>
-
-            <div id="status-msg" class="status-msg">Ready. Adjust inputs and click Run.</div>
-
-            <div id="results" class="results hidden">
-                <div class="result-section">
-                    <h3>Tread Depth (mm)</h3>
-                    <div id="tread-table"></div>
-                </div>
-
-                <div class="result-section">
-                    <h3>Pressure (kPa)</h3>
-                    <div id="pressure-table"></div>
-                </div>
-
-                <div class="result-section">
-                    <h3>Alignment</h3>
-                    <div id="alignment-table"></div>
-                </div>
-
-                <div class="result-section">
-                    <h3>Torque Ceiling</h3>
-                    <div id="torque-info"></div>
-                </div>
-
-                <div class="result-section">
-                    <h3>Recoverable Energy</h3>
-                    <div id="energy-info"></div>
-                </div>
-
-                <div class="result-section">
-                    <h3>Variance Reduction</h3>
-                    <div id="variance-bars"></div>
-                </div>
+      <!-- Physics Pipeline & Observability -->
+      <div class="flex flex-col space-y-6">
+        <!-- Pipeline -->
+        <div class="hud-panel p-6 flex-1">
+          <h2 class="font-label-caps text-label-caps text-on-surface-variant mb-4 uppercase tracking-wider">Physics Pipeline</h2>
+          <div class="flex flex-col space-y-4">
+            <div class="flex items-center space-x-3 p-3 bg-surface-container-low rounded-lg border border-outline-variant">
+              <span class="material-symbols-outlined text-primary-container">input</span>
+              <span class="font-data-mono text-sm text-on-surface">Raw IMU/CAN Data</span>
             </div>
-        </section>
-    </main>
+            <div class="w-px h-4 bg-outline-variant mx-auto"></div>
+            <div class="flex items-center space-x-3 p-3 bg-surface-container-low rounded-lg border border-outline-variant">
+              <span class="material-symbols-outlined text-primary-container">filter_alt</span>
+              <span class="font-data-mono text-sm text-on-surface">Pre-filtering (EKF)</span>
+            </div>
+            <div class="w-px h-4 bg-outline-variant mx-auto"></div>
+            <div id="pipeline-active" class="flex items-center space-x-3 p-3 bg-surface-container-high rounded-lg border border-primary-container/50 relative overflow-hidden">
+              <div class="absolute inset-0 bg-primary-container opacity-5"></div>
+              <span class="material-symbols-outlined text-primary-container relative z-10">memory</span>
+              <span class="font-data-mono text-sm text-primary-container font-bold relative z-10">Gauss-Newton Optimization</span>
+            </div>
+            <div class="w-px h-4 bg-outline-variant mx-auto"></div>
+            <div class="flex items-center space-x-3 p-3 bg-surface-container-low rounded-lg border border-outline-variant">
+              <span class="material-symbols-outlined text-primary-container">output</span>
+              <span class="font-data-mono text-sm text-on-surface">State Estimates</span>
+            </div>
+          </div>
+        </div>
+        <!-- Observability Mini -->
+        <div class="hud-panel p-6">
+          <h2 class="font-label-caps text-label-caps text-on-surface-variant mb-4 uppercase tracking-wider">Observability Index</h2>
+          <div id="obs-bars" class="space-y-4">
+            <div>
+              <div class="flex justify-between font-data-mono text-xs mb-1"><span class="text-on-surface-variant">Tread Obsv</span><span id="obs-tread" class="text-primary-container">—</span></div>
+              <div class="w-full bg-surface-container-low h-2 rounded-full overflow-hidden border border-outline-variant/30">
+                <div id="obs-tread-bar" class="bg-primary-container h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+              </div>
+            </div>
+            <div>
+              <div class="flex justify-between font-data-mono text-xs mb-1"><span class="text-on-surface-variant">Pressure Obsv</span><span id="obs-pressure" class="text-primary-container">—</span></div>
+              <div class="w-full bg-surface-container-low h-2 rounded-full overflow-hidden border border-outline-variant/30">
+                <div id="obs-pressure-bar" class="bg-primary-container h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+              </div>
+            </div>
+            <div>
+              <div class="flex justify-between font-data-mono text-xs mb-1"><span class="text-on-surface-variant">Toe Obsv</span><span id="obs-toe" class="text-primary-container">—</span></div>
+              <div class="w-full bg-surface-container-low h-2 rounded-full overflow-hidden border border-outline-variant/30">
+                <div id="obs-toe-bar" class="bg-primary-container h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
-    <footer>
-        <p>EV Tyre Intelligence &mdash; physics &rarr; sensor model &rarr; estimator &rarr; decision</p>
-    </footer>
+    <!-- Full State Table -->
+    <div class="hud-panel p-6 overflow-x-auto">
+      <h2 class="font-label-caps text-label-caps text-on-surface-variant mb-4 uppercase tracking-wider">Full State Estimation Matrix</h2>
+      <table class="w-full text-left border-collapse min-w-[600px]">
+        <thead>
+          <tr class="border-b border-outline-variant border-opacity-50 font-label-caps text-[10px] text-on-surface-variant">
+            <th class="pb-3 pt-2 font-medium">STATE PARAMETER</th>
+            <th class="pb-3 pt-2 font-medium text-right">ESTIMATE</th>
+            <th class="pb-3 pt-2 font-medium text-right">SIGMA (σ)</th>
+            <th class="pb-3 pt-2 font-medium text-right">VR×</th>
+            <th class="pb-3 pt-2 font-medium text-center">STATUS</th>
+          </tr>
+        </thead>
+        <tbody id="state-table-body" class="font-data-mono text-sm">
+          <tr><td colspan="5" class="py-8 text-center text-on-surface-variant">Run estimator to populate</td></tr>
+        </tbody>
+      </table>
+    </div>
 
-    <script src="app.js"></script>
+    <!-- Simulator Controls -->
+    <div class="hud-panel p-6">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Environment Simulator</h2>
+        <span id="sim-status" class="px-2 py-1 bg-surface-container-highest rounded text-[10px] font-label-caps text-on-surface-variant border border-outline-variant">READY</span>
+      </div>
+      <p class="font-body-sm text-sm text-on-surface-variant mb-6">Adjust sliders and click Run to estimate, or use Random Simulation for a demo scenario.</p>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <div class="p-4 border border-outline-variant rounded-lg bg-surface-container-low">
+          <div class="font-label-caps text-xs text-on-surface mb-3">Tyre Pressure — FL (kPa)</div>
+          <div class="flex items-center space-x-3">
+            <input id="slider-pfl" class="w-full accent-primary-container" type="range" min="150" max="320" value="240" step="5">
+            <span id="val-pfl" class="font-data-mono text-sm text-primary-container w-12 text-right">240</span>
+          </div>
+        </div>
+        <div class="p-4 border border-outline-variant rounded-lg bg-surface-container-low">
+          <div class="font-label-caps text-xs text-on-surface mb-3">Tyre Pressure — FR (kPa)</div>
+          <div class="flex items-center space-x-3">
+            <input id="slider-pfr" class="w-full accent-primary-container" type="range" min="150" max="320" value="240" step="5">
+            <span id="val-pfr" class="font-data-mono text-sm text-primary-container w-12 text-right">240</span>
+          </div>
+        </div>
+        <div class="p-4 border border-outline-variant rounded-lg bg-surface-container-low">
+          <div class="font-label-caps text-xs text-on-surface mb-3">Tyre Pressure — RL (kPa)</div>
+          <div class="flex items-center space-x-3">
+            <input id="slider-prl" class="w-full accent-primary-container" type="range" min="150" max="320" value="240" step="5">
+            <span id="val-prl" class="font-data-mono text-sm text-primary-container w-12 text-right">240</span>
+          </div>
+        </div>
+        <div class="p-4 border border-outline-variant rounded-lg bg-surface-container-low">
+          <div class="font-label-caps text-xs text-on-surface mb-3">Tyre Pressure — RR (kPa)</div>
+          <div class="flex items-center space-x-3">
+            <input id="slider-prr" class="w-full accent-primary-container" type="range" min="150" max="320" value="240" step="5">
+            <span id="val-prr" class="font-data-mono text-sm text-primary-container w-12 text-right">240</span>
+          </div>
+        </div>
+        <div class="p-4 border border-outline-variant rounded-lg bg-surface-container-low">
+          <div class="font-label-caps text-xs text-on-surface mb-3">Wheel-Speed Ratio — Front</div>
+          <div class="flex items-center space-x-3">
+            <input id="slider-rf" class="w-full accent-primary-container" type="range" min="0.980" max="1.020" value="1.000" step="0.001">
+            <span id="val-rf" class="font-data-mono text-sm text-primary-container w-12 text-right">1.000</span>
+          </div>
+        </div>
+        <div class="p-4 border border-outline-variant rounded-lg bg-surface-container-low">
+          <div class="font-label-caps text-xs text-on-surface mb-3">Wheel-Speed Ratio — Rear</div>
+          <div class="flex items-center space-x-3">
+            <input id="slider-rr" class="w-full accent-primary-container" type="range" min="0.980" max="1.020" value="1.000" step="0.001">
+            <span id="val-rr" class="font-data-mono text-sm text-primary-container w-12 text-right">1.000</span>
+          </div>
+        </div>
+        <div class="p-4 border border-outline-variant rounded-lg bg-surface-container-low">
+          <div class="font-label-caps text-xs text-on-surface mb-3">Ambient Temperature (°C)</div>
+          <div class="flex items-center space-x-3">
+            <input id="slider-temp" class="w-full accent-primary-container" type="range" min="0" max="60" value="25" step="1">
+            <span id="val-temp" class="font-data-mono text-sm text-primary-container w-12 text-right">25</span>
+          </div>
+        </div>
+      </div>
+      <div class="flex space-x-4">
+        <button id="run-btn" class="px-6 py-3 bg-primary-container text-on-primary rounded-lg font-label-caps text-label-caps font-bold hover:opacity-90 transition-opacity border border-outline-variant">
+          Run Estimator
+        </button>
+        <button id="sim-btn" class="px-6 py-3 bg-surface-container-highest text-on-surface rounded-lg font-label-caps text-label-caps font-bold hover:bg-surface-bright transition-colors border border-outline-variant">
+          Random Simulation
+        </button>
+      </div>
+    </div>
+
+  </div>
+</main>
+</div>
+
+<!-- Footer -->
+<footer class="bg-surface-container-lowest flex justify-between items-center px-margin-desktop py-2 w-full fixed bottom-0 z-40 border-t border-outline-variant/20 shadow-sm">
+  <div class="font-body-sm text-body-sm text-on-surface-variant">EV Tyre Intelligence — physics → sensor model → estimator → decision</div>
+  <div class="flex space-x-6">
+    <a class="font-body-sm text-body-sm hover:text-primary transition-opacity text-on-surface-variant" href="http://localhost:8000/docs" target="_blank">API Docs</a>
+    <a class="font-body-sm text-body-sm hover:text-primary transition-opacity text-on-surface-variant" href="#">GitHub</a>
+  </div>
+</footer>
+
+<script>
+const API_BASE = "http://localhost:8000";
+const CORNERS = ["FL", "FR", "RL", "RR"];
+
+// ---------------------------------------------------------------------------
+// Slider sync
+// ---------------------------------------------------------------------------
+const sliders = [
+  { id: "slider-pfl", val: "val-pfl", fmt: v => v },
+  { id: "slider-pfr", val: "val-pfr", fmt: v => v },
+  { id: "slider-prl", val: "val-prl", fmt: v => v },
+  { id: "slider-prr", val: "val-prr", fmt: v => v },
+  { id: "slider-rf",  val: "val-rf",  fmt: v => parseFloat(v).toFixed(3) },
+  { id: "slider-rr",  val: "val-rr",  fmt: v => parseFloat(v).toFixed(3) },
+  { id: "slider-temp", val: "val-temp", fmt: v => v },
+];
+sliders.forEach(s => {
+  const el = document.getElementById(s.id);
+  const disp = document.getElementById(s.val);
+  el.addEventListener("input", () => { disp.textContent = s.fmt(el.value); });
+});
+
+function getInput() {
+  return {
+    pressure_fl: parseFloat(document.getElementById("slider-pfl").value),
+    pressure_fr: parseFloat(document.getElementById("slider-pfr").value),
+    pressure_rl: parseFloat(document.getElementById("slider-prl").value),
+    pressure_rr: parseFloat(document.getElementById("slider-prr").value),
+    ratio_front: parseFloat(document.getElementById("slider-rf").value),
+    ratio_rear:  parseFloat(document.getElementById("slider-rr").value),
+    temperature: parseFloat(document.getElementById("slider-temp").value),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// API calls
+// ---------------------------------------------------------------------------
+async function callEstimate(body) {
+  const resp = await fetch(`${API_BASE}/api/estimate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  return resp.json();
+}
+
+async function callSimulation() {
+  const resp = await fetch(`${API_BASE}/api/simulation`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ seed: null, iters: 6 }),
+  });
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  return resp.json();
+}
+
+// ---------------------------------------------------------------------------
+// Update UI from estimate response
+// ---------------------------------------------------------------------------
+function updateDashboard(est) {
+  // Corner cards
+  const corners = { FL: 0, FR: 1, RL: 2, RR: 3 };
+  CORNERS.forEach(c => {
+    const card = document.getElementById(`card-${c.toLowerCase()}`);
+    const treadState = est.states.find(s => s.name === `tread_${c}`);
+    const pressState = est.states.find(s => s.name === `press_${c}`);
+    if (treadState) {
+      card.querySelector(".tread-val").textContent = treadState.value.toFixed(1);
+      card.querySelector(".tread-val").setAttribute("data-metric", treadState.value.toFixed(1));
+      card.querySelector(".sigma-val").textContent = treadState.sigma.toFixed(3);
+      // Color coding
+      const treadDiv = card.querySelector(".tread-val").parentElement;
+      if (treadState.value < 1.6) {
+        treadDiv.className = "text-error text-right text-glow";
+        card.querySelector(".border-l-2").className = card.querySelector(".border-l-2").className.replace("border-l-primary-container", "border-l-error");
+      } else if (treadState.value < 3.0) {
+        treadDiv.className = "text-yellow-400 text-right";
+        card.querySelector(".border-l-2").className = card.querySelector(".border-l-2").className.replace("border-l-primary-container", "border-l-yellow-400");
+      } else {
+        treadDiv.className = "text-primary-container text-right";
+      }
+    }
+    if (pressState) {
+      card.querySelector(".press-val").textContent = Math.round(pressState.value);
+      card.querySelector(".press-val").setAttribute("data-metric", Math.round(pressState.value));
+    }
+  });
+
+  // KPI cards
+  const treadStates = est.states.filter(s => s.name.startsWith("tread_"));
+  const treadMAE = treadStates.reduce((sum, s) => sum + s.sigma, 0) / 4;
+  document.getElementById("kpi-tread").innerHTML = `${treadMAE.toFixed(3)}<span class="text-sm text-on-surface-variant ml-1">mm</span>`;
+
+  const pressStates = est.states.filter(s => s.name.startsWith("press_"));
+  const pressMAE = pressStates.reduce((sum, s) => sum + s.sigma, 0) / 4;
+  document.getElementById("kpi-pressure").innerHTML = `${pressMAE.toFixed(1)}<span class="text-sm text-on-surface-variant ml-1">kPa</span>`;
+
+  document.getElementById("kpi-convergence").innerHTML = `${est.iterations}<span class="text-sm text-on-surface-variant ml-1">iter</span>`;
+
+  const energyPct = est.recoverable_energy_pct;
+  document.getElementById("kpi-energy").innerHTML = `${energyPct > 0 ? '+' : ''}${energyPct.toFixed(1)}<span class="text-sm text-on-surface-variant ml-1">%</span>`;
+
+  // Observability bars
+  const treadObs = est.states.find(s => s.name === "tread_FL");
+  const pressObs = est.states.find(s => s.name === "press_FL");
+  const toeObs = est.states.find(s => s.name === "toe^2");
+
+  if (treadObs) {
+    const pct = Math.min(100, (treadObs.variance_reduction / 25) * 100);
+    document.getElementById("obs-tread").textContent = treadObs.variance_reduction.toFixed(1) + "×";
+    document.getElementById("obs-tread-bar").style.width = pct + "%";
+  }
+  if (pressObs) {
+    const pct = Math.min(100, (pressObs.variance_reduction / 25) * 100);
+    document.getElementById("obs-pressure").textContent = pressObs.variance_reduction.toFixed(1) + "×";
+    document.getElementById("obs-pressure-bar").style.width = pct + "%";
+  }
+  if (toeObs) {
+    const pct = Math.min(100, (toeObs.variance_reduction / 25) * 100);
+    document.getElementById("obs-toe").textContent = toeObs.variance_reduction.toFixed(1) + "×";
+    document.getElementById("obs-toe-bar").style.width = pct + "%";
+  }
+
+  // State table
+  const tbody = document.getElementById("state-table-body");
+  tbody.innerHTML = est.states.map((s, i) => {
+    const isWarn = s.observability === "NO_INFORMATION";
+    const rowBg = i % 2 === 0 ? "bg-primary-container/5" : "";
+    return `<tr class="border-b border-outline-variant border-opacity-30 hover:bg-surface-container-high transition-colors ${rowBg}">
+      <td class="py-3 text-on-surface">${s.name}</td>
+      <td class="py-3 text-primary-container text-right">${s.value.toFixed(3)}</td>
+      <td class="py-3 text-on-surface-variant text-right">${s.sigma.toFixed(4)}</td>
+      <td class="py-3 text-on-surface-variant text-right">${s.variance_reduction.toFixed(1)}×</td>
+      <td class="py-3 text-center"><span class="inline-block w-2.5 h-2.5 rounded-full ${isWarn ? 'bg-yellow-400 shadow-[0_0_5px_#facc15]' : 'bg-green-400 shadow-[0_0_5px_#4ade80]'}"></span></td>
+    </tr>`;
+  }).join("");
+}
+
+// ---------------------------------------------------------------------------
+// Event handlers
+// ---------------------------------------------------------------------------
+document.getElementById("run-btn").addEventListener("click", async () => {
+  const btn = document.getElementById("run-btn");
+  btn.textContent = "Running...";
+  btn.disabled = true;
+  try {
+    const est = await callEstimate(getInput());
+    updateDashboard(est);
+    document.getElementById("status-dot").className = "w-2 h-2 rounded-full bg-green-400 animate-pulse";
+    document.getElementById("status-text").textContent = `Converged: ${est.iterations} iter`;
+    document.getElementById("sim-status").textContent = "ONLINE";
+    document.getElementById("pipeline-active").className = document.getElementById("pipeline-active").className.replace("opacity-50", "opacity-100");
+  } catch (err) {
+    document.getElementById("status-dot").className = "w-2 h-2 rounded-full bg-red-400";
+    document.getElementById("status-text").textContent = "Error: " + err.message;
+  }
+  btn.textContent = "Run Estimator";
+  btn.disabled = false;
+});
+
+document.getElementById("sim-btn").addEventListener("click", async () => {
+  const btn = document.getElementById("sim-btn");
+  btn.textContent = "Simulating...";
+  btn.disabled = true;
+  try {
+    const data = await callSimulation();
+    updateDashboard(data.estimate);
+    document.getElementById("status-dot").className = "w-2 h-2 rounded-full bg-green-400 animate-pulse";
+    document.getElementById("status-text").textContent = `Simulation: ${data.estimate.iterations} iter`;
+    document.getElementById("sim-status").textContent = "SIMULATED";
+  } catch (err) {
+    document.getElementById("status-dot").className = "w-2 h-2 rounded-full bg-red-400";
+    document.getElementById("status-text").textContent = "Error: " + err.message;
+  }
+  btn.textContent = "Random Simulation";
+  btn.disabled = false;
+});
+
+// Unit toggle
+function setUnits(system) {
+  const isImperial = system === "imperial";
+  document.getElementById("btn-metric").className = isImperial
+    ? "px-3 py-1 text-xs font-label-caps rounded-md text-on-surface-variant hover:text-on-surface transition-colors"
+    : "px-3 py-1 text-xs font-label-caps rounded-md bg-primary-container transition-colors font-bold text-on-primary";
+  document.getElementById("btn-imperial").className = isImperial
+    ? "px-3 py-1 text-xs font-label-caps rounded-md bg-primary-container transition-colors font-bold text-on-primary"
+    : "px-3 py-1 text-xs font-label-caps rounded-md text-on-surface-variant hover:text-on-surface transition-colors";
+
+  document.querySelectorAll(".tread-val").forEach(el => {
+    const m = parseFloat(el.getAttribute("data-metric"));
+    if (isNaN(m)) return;
+    el.textContent = isImperial ? (m * 0.0393701).toFixed(2) : m.toFixed(1);
+  });
+  document.querySelectorAll(".tread-unit").forEach(el => { el.textContent = isImperial ? "in" : "mm"; });
+
+  document.querySelectorAll(".press-val").forEach(el => {
+    const m = parseFloat(el.getAttribute("data-metric"));
+    if (isNaN(m)) return;
+    el.textContent = isImperial ? Math.round(m * 0.145038) : Math.round(m);
+  });
+  document.querySelectorAll(".press-unit").forEach(el => { el.textContent = isImperial ? "PSI" : "kPa"; });
+}
+
+// Health check on load
+fetch(`${API_BASE}/api/health`)
+  .then(r => r.json())
+  .then(d => {
+    document.getElementById("status-dot").className = "w-2 h-2 rounded-full bg-green-400 animate-pulse";
+    document.getElementById("status-text").textContent = `Connected (v${d.version})`;
+    document.getElementById("status-badge").textContent = "Estimator Online";
+  })
+  .catch(() => {
+    document.getElementById("status-dot").className = "w-2 h-2 rounded-full bg-red-400";
+    document.getElementById("status-text").textContent = "Backend offline";
+    document.getElementById("status-badge").textContent = "Offline";
+    document.getElementById("status-badge").className = "bg-red-400/20 font-label-caps text-label-caps px-4 py-2 rounded-lg font-bold text-red-400 border border-outline-variant";
+  });
+</script>
 </body>
 </html>
