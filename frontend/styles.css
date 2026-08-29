@@ -1,0 +1,180 @@
+/* EV Tyre Intelligence Dashboard — Dark Theme */
+
+:root {
+    --bg: #0f1117;
+    --panel: #1a1d27;
+    --border: #2a2d3a;
+    --text: #e0e0e0;
+    --text-muted: #888;
+    --accent: #3498db;
+    --green: #27ae60;
+    --yellow: #f39c12;
+    --red: #e74c3c;
+    --bar-bg: #2a2d3a;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+}
+
+header {
+    text-align: center;
+    padding: 1.5rem 1rem 0.5rem;
+    border-bottom: 1px solid var(--border);
+}
+
+header h1 { font-size: 1.5rem; font-weight: 600; }
+header .subtitle { color: var(--text-muted); font-size: 0.85rem; margin-top: 0.3rem; }
+
+main {
+    display: grid;
+    grid-template-columns: 360px 1fr;
+    gap: 1rem;
+    padding: 1rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.2rem;
+}
+
+.panel h2 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+}
+
+/* Input panel */
+.input-group { margin-bottom: 1rem; }
+.input-group h3 {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+}
+
+.slider-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.3rem;
+}
+
+.slider-row label {
+    min-width: 80px;
+    font-size: 0.85rem;
+}
+
+.slider-row input[type="range"] {
+    flex: 1;
+    accent-color: var(--accent);
+    height: 4px;
+}
+
+.slider-row span { font-variant-numeric: tabular-nums; min-width: 50px; text-align: right; font-size: 0.85rem; }
+
+.button-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.btn {
+    flex: 1;
+    padding: 0.6rem 1rem;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.btn.primary { background: var(--accent); color: #fff; }
+.btn.primary:hover { background: #2980b9; }
+
+.btn.secondary { background: var(--border); color: var(--text); }
+.btn.secondary:hover { background: #3a3d4a; }
+
+/* Status */
+.status-msg {
+    padding: 0.5rem 0.8rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    margin-bottom: 1rem;
+    background: var(--bar-bg);
+}
+.status-msg.success { background: rgba(39,174,96,0.15); color: var(--green); }
+.status-msg.error   { background: rgba(231,76,60,0.15); color: var(--red); }
+.status-msg.loading { background: rgba(52,152,219,0.15); color: var(--accent); }
+
+/* Results */
+.hidden { display: none !important; }
+
+.result-section { margin-bottom: 1rem; }
+.result-section h3 {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.4rem;
+}
+
+.data-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0;
+    font-size: 0.85rem;
+}
+
+.corner { min-width: 30px; font-weight: 600; color: var(--accent); }
+.value  { font-variant-numeric: tabular-nums; }
+.sigma  { font-size: 0.75rem; color: var(--text-muted); }
+.warn   { color: var(--yellow); }
+
+.bar-container {
+    flex: 1;
+    height: 6px;
+    background: var(--bar-bg);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.bar {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.truth-header {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-bottom: 0.3rem;
+}
+
+footer {
+    text-align: center;
+    padding: 1rem;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    border-top: 1px solid var(--border);
+}
+
+/* Responsive */
+@media (max-width: 800px) {
+    main { grid-template-columns: 1fr; }
+}
