@@ -7,6 +7,8 @@ frequency, rolling resistance, wet friction, toe drag, and road load.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import numpy as np
 
 
@@ -44,6 +46,9 @@ class Vehicle:
     rho_air       = 1.20          # kg/m^3
 
     C_alpha       = 55_000.0      # cornering stiffness, N/rad
+
+    gear_ratio    = 9.0           # single-speed reduction gear ratio
+    drivetrain_eff = 0.92         # drivetrain efficiency (motor to wheels)
 
     mu_dry        = 1.00
     wet_floor     = 0.45
@@ -108,6 +113,150 @@ def toe_drag_from_sq(toe_sq_deg2: float) -> float:
     """Toe drag from toe-squared (avoids sqrt in linearised estimator)."""
     return 2.0 * Vehicle.C_alpha * (np.pi / 180.0) ** 2 * toe_sq_deg2
 
+
+# ---------------------------------------------------------------------------
+# Drivetrain configuration for independent road-load measurement (Phase 4)
+# ---------------------------------------------------------------------------
+
+@dataclass
+class DrivetrainConfig:
+    """Drivetrain parameters for motor-torque-derived road load.
+
+    These are vehicle-level constants that do NOT depend on tyre state.
+    They define the physical path from motor torque to tractive force.
+
+    Attributes
+    ----------
+    gear_ratio : float
+        Motor-to-wheel reduction ratio (dimensionless). Typical EV: 8-12.
+    efficiency : float
+        Powertrain efficiency from motor shaft to tyre contact patch (0, 1].
+        Accounts for gear mesh losses, bearing friction, and axle losses.
+    rolling_radius : float
+        Effective rolling radius of the driven wheels (m).
+        Used to convert tractive force to motor torque.
+    mass : float
+        Vehicle mass (kg). Used for inertial force calculation.
+    CdA : float
+        Drag area (m^2 = Cd * frontal_area). Used for aero drag.
+    rho_air : float
+        Air density (kg/m^3). Standard value 1.20 at sea level.
+    g : float
+        Gravitational acceleration (m/s^2). Used for grade force.
+    grade_rad : float
+        Road grade in radians. 0 if unknown. MUST NOT be set from tyre model.
+    """
+    gear_ratio: float = Vehicle.gear_ratio       # motor-to-wheel reduction
+    efficiency: float = Vehicle.drivetrain_eff    # powertrain efficiency (0-1]
+    rolling_radius: float = Vehicle.r_belt        # effective wheel radius (m)
+    mass: float = Vehicle.mass                    # vehicle mass (kg)
+    CdA: float = Vehicle.CdA                     # drag area (m^2)
+    rho_air: float = Vehicle.rho_air             # air density (kg/m^3)
+    g: float = Vehicle.g                         # gravitational accel (m/s^2)
+    grade_rad: float = 0.0                       # road grade (rad), 0 if unknown
+
+    def validate(self) -> bool:
+        """Return True if configuration is physically valid."""
+        return (
+            0.0 < self.efficiency <= 1.0
+            and self.gear_ratio > 0.0
+            and self.rolling_radius > 0.0
+            and self.mass > 0.0
+            and self.CdA > 0.0
+        )
+
+
+def aero_drag_force(v_ms: float, CdA: float = Vehicle.CdA,
+                    rho: float = Vehicle.rho_air) -> float:
+    """Aerodynamic drag force (N). Depends on velocity only, NOT on tyre state."""
+    return 0.5 * rho * CdA * v_ms ** 2
+
+
+def motor_torque_measurement(
+    state,
+    v_ms: float,
+    accel_ms2: float = 0.0,
+    grade_rad: float = 0.0,
+    drivetrain: DrivetrainConfig | None = None,
+) -> float:
+    """Compute expected motor torque from tyre state and vehicle dynamics.
+
+    Uses Newton's second law to derive the tractive force required::
+
+        F_traction = F_aero + F_rolling + F_grade + F_inertia
+
+    Then converts to motor torque through drivetrain parameters::
+
+        T_motor = F_traction * r_eff / (gear_ratio * efficiency)
+
+    CRITICAL: F_rolling is computed from tyre state (tread, pressure, temp)
+    but the MEASUREMENT of motor torque comes from the drivetrain, NOT
+    from the rolling resistance model. The estimator uses this forward
+    model to compute the Jacobian, but the actual measurement data is
+    an independent observation from the motor/drivetrain.
+
+    Parameters
+    ----------
+    state : array-like
+        State vector [tread(4), press(4), toe^2, camber, ...].
+        toe^2 is at index 8. The state may have additional elements
+        (e.g. accel, grade) which are NOT used here; those are passed
+        as separate parameters.
+    v_ms : float
+        Vehicle speed (m/s). Required.
+    accel_ms2 : float
+        Vehicle longitudinal acceleration (m/s^2). 0 if unknown.
+    grade_rad : float
+        Road grade in radians. 0 if unknown.
+    drivetrain : DrivetrainConfig, optional
+        Drivetrain parameters. Uses defaults if None.
+
+    Returns
+    -------
+    float
+        Expected motor torque (N.m).
+    """
+    if drivetrain is None:
+        drivetrain = DrivetrainConfig()
+
+    tread = {c: float(state[i]) for i, c in enumerate(CORNERS)}
+    press = {c: float(state[4 + i]) for i, c in enumerate(CORNERS)}
+    temp  = {c: 25.0 for c in CORNERS}  # use reference temp for predict
+    toe_sq = float(max(0.0, state[8]))  # toe^2 at index 8
+
+    # Aerodynamic drag (independent of tyre state)
+    F_aero = aero_drag_force(v_ms, drivetrain.CdA, drivetrain.rho_air)
+
+    # Rolling resistance (depends on tyre state -- this is what we want to observe)
+    F_rr = sum(
+        rolling_resistance_coeff(tread[c], press[c], temp[c])
+        * Vehicle.Fz(c)
+        for c in CORNERS
+    )
+
+    # Grade force (uses known grade, NOT derived from tyre model)
+    F_grade = drivetrain.mass * drivetrain.g * np.sin(grade_rad)
+
+    # Inertial force
+    F_inertia = drivetrain.mass * accel_ms2
+
+    # Toe drag force (depends on toe^2 state -- key for toe observability)
+    F_toe = toe_drag_from_sq(toe_sq)
+
+    # Total tractive force (includes toe drag as observable contributor)
+    F_traction = F_aero + F_rr + F_grade + F_inertia + F_toe
+
+    # Motor torque through drivetrain
+    T_motor = F_traction * drivetrain.rolling_radius / (
+        drivetrain.gear_ratio * drivetrain.efficiency
+    )
+
+    return T_motor
+
+
+# ---------------------------------------------------------------------------
+# Original road load (Phase 1-3, kept for backward compatibility)
+# ---------------------------------------------------------------------------
 
 def road_load(state, v_ms: float, accel_ms2: float = 0.0, grade_rad: float = 0.0) -> float:
     """Total road load force (N) at velocity v_ms."""

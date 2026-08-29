@@ -10,6 +10,7 @@ import pytest
 from backend.estimator import (
     CORNERS,
     IDX_TREAD,
+    N_MEAS,
     SensorNoise,
     TyreState,
     estimate,
@@ -79,9 +80,15 @@ class TestEstimator:
         assert x0.shape == (10,)
         assert P0.shape == (10, 10)
 
+    def test_measurement_dimension(self):
+        """Phase 4: measurement vector is 12 (added motor torque channel)."""
+        assert N_MEAS == 12
+
     def test_measurement_covariance_positive(self):
         R = measurement_covariance()
-        assert np.all(np.diag(R) > 0)
+        assert R.shape == (12, 12)
+        diag = np.diag(R)
+        assert np.all(diag > 0)
 
     def test_estimate_returns_correct_shape(self):
         rng = np.random.default_rng(42)
@@ -174,4 +181,7 @@ class TestAPI:
     def test_estimator_status(self, client):
         resp = client.get("/api/estimator/status")
         assert resp.status_code == 200
-        assert resp.json()["n_state"] == 10
+        data = resp.json()
+        assert data["n_state"] == 10
+        assert data["n_measurement"] == 12  # Phase 4
+        assert "motor_torque" in data["measurement_channels"]
