@@ -1,8 +1,8 @@
 # Phase 3 — Current State (for handoff)
 
 **Date:** 29 August 2026
-**Branch:** phase2-features
-**Tests:** 173 passing, 146 subtests
+**Branch:** phase3-estimator
+**Tests:** 225 passing
 **Freeze guard:** passing (Phase 1 files untouched except TyreConfig amendment)
 
 ---
@@ -179,6 +179,17 @@ Legacy had it right; Phase 3 had it flipped.
 **Before:** `road_load_coefficient` = F_total/(m*g*v) (units: s/m)
 **After:** Dimensionless C_rr mean
 
+**And then withdrawn as a measurement entirely.** Making the coefficient
+dimensionless fixed the units but left it a pure function of TPMS pressure and
+temperature — measured on a live frame it does not respond to motor torque, to
+longitudinal acceleration, or to vehicle speed at all. It is the pressure
+information restated through the C_rr formula, so admitting it double-counted
+`z[press_*]` and let the estimator move tread to close the gap between the
+measured coefficient (which omits the tread term) and the predicted one (which
+includes it). The channel is no longer appended to `available`. Re-enable only
+when it is derived from an actual force measurement — motor torque minus aero
+and inertia — which additionally needs the missing grade channel (gap G6).
+
 ### 5. Confidence metric (E4)
 **Before:** `confidence = len(available)/MEAS.N` (counts zero-info channels)
 **After:** `n_states_observed` + `mean_variance_reduction` (honest)
@@ -191,21 +202,59 @@ Legacy had it right; Phase 3 had it flipped.
 
 ## Current demo output
 
+Pasted verbatim from `python scripts/run_demo.py`:
+
 ```
 Estimator Output:
-  tread_FL            4.9808  +/- 1.9238  OBSERVED
-  tread_FR            4.1182  +/- 1.9206  OBSERVED
-  tread_RL            4.3428  +/- 1.9192  OBSERVED
-  tread_RR            4.7567  +/- 1.9226  OBSERVED
+--------------------------------------------------
+  tread_FL            4.9808  +/- 1.9238  WEAK
+    Only the within-axle difference is constrained (marginal variance
+    reduction 0.4079, but common-mode reduction only 0.0000); the absolute
+    level is not recoverable without an independent channel
+  tread_FR            4.1182  +/- 1.9206  WEAK
+    Only the within-axle difference is constrained (marginal variance
+    reduction 0.4098, but common-mode reduction only 0.0000); ...
+  tread_RL            4.3428  +/- 1.9192  WEAK
+    Only the within-axle difference is constrained (marginal variance
+    reduction 0.4106, but common-mode reduction only 0.0000); ...
+  tread_RR            4.7567  +/- 1.9226  WEAK
+    Only the within-axle difference is constrained (marginal variance
+    reduction 0.4086, but common-mode reduction only 0.0000); ...
   press_FL          238.0794  +/- 4.9581  OBSERVED
   press_FR          240.9370  +/- 4.9583  OBSERVED
   press_RL          232.0953  +/- 4.9567  OBSERVED
   press_RR          244.9479  +/- 4.9577  OBSERVED
-  toe^2               0.1000  +/- 0.4000  WEAK [magnitude-only]
+  toe^2               0.1000  +/- 0.4000  UNOBSERVABLE [magnitude-only]
+    Zero Jacobian sensitivity (0.00e+00) - posterior equals prior
   camber              0.0000  +/- 1.0000  UNOBSERVABLE
-  States observed:  8/10
-  Mean var. reduction: 0.5575
+    Zero Jacobian sensitivity (0.00e+00) - posterior equals prior
+
+  States observed:  4/10
+  Mean var. reduction: 0.9846   (over OBSERVED states only)
+  Measurements:     6 channels admitted
 ```
+
+### How to read this
+
+**Pressure is the only thing this system currently knows.** 4 of 10 states are
+OBSERVED, and all four are pressures, each with a near-direct TPMS sensor.
+
+**The four tread numbers are real but relative.** The axle ratio r_R/r_L
+constrains the tread DIFFERENCE across an axle; the common mode — both corners
+wearing together — is unconstrained, which is why the common-mode reduction
+prints as 0.0000 while the marginal reduction is ~0.41. So the FL-vs-FR spread
+is meaningful and the absolute 4.98 mm is not. Do not quote a tread depth from
+this output.
+
+**`Mean var. reduction: 0.9846` is over OBSERVED states only** — i.e. it
+describes the pressure estimates, not tread. Averaging in states already
+labelled WEAK or UNOBSERVABLE would mix two different questions.
+
+An earlier revision of this document showed all four tread states as OBSERVED
+with `States observed: 8/10` and `Mean var. reduction: 0.5575`. That was
+recorded before the toe term was removed from the road-load prediction and
+before the common-mode check existed. Those numbers are wrong; the values
+themselves (4.9808 etc.) were and remain correct.
 
 ---
 
@@ -233,6 +282,20 @@ legacy/ev_tyre_fusion.py    — Reference implementation (hash guard)
 ## How to verify everything works
 
 ```bash
-python -m pytest tests/ -q          # Should show 173 passed
-python scripts/run_demo.py          # Should show honest observability output
+python -m unittest discover -s tests -t .   # Should show 225 passing
+python -m unittest tests.test_phase1_frozen # Freeze guard, must stay green
+python scripts/run_demo.py                  # Honest observability output
 ```
+
+pytest is not a dependency of this project — the suite runs on the standard
+library's `unittest`, per the stdlib + numpy constraint.
+
+The two gate suites are the ones that matter most here:
+
+- `tests/test_observability.py` — asserts that a state sitting at its prior is
+  never labelled OBSERVED. This is the class whose absence let tread, toe and
+  the confidence metric ship wrong; it caught the common-mode bug immediately.
+- `tests/test_physics.py` — locks the axle-ratio direction. The measurement is
+  omega_left/omega_right and omega is inversely proportional to radius, so the
+  prediction must be r_right/r_left. If that inverts, every tread difference
+  silently carries the wrong sign and nothing else would catch it.
