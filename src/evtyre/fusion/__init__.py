@@ -29,6 +29,40 @@ from .forecast import (
     compute_forecasts,
     format_forecast,
 )
+from .nonlinear_wear import (
+    NonLinearFit,
+    NonLinearWearReport,
+    WearModel,
+    fit_nonlinear_wear,
+    format_nonlinear_report,
+)
+from .asymmetric import (
+    AsymmetryReport,
+    AsymmetryType,
+    CornerAnalysis,
+    Severity,
+    detect_asymmetry,
+    format_asymmetry_report,
+)
+from .anomaly import (
+    AnomalyEvent,
+    AnomalyReport,
+    AnomalySeverity,
+    AnomalyType,
+    detect_anomalies,
+    format_anomaly_report,
+)
+from .thermal_degradation import (
+    ThermalDegradationReport,
+    ThermalModelConfig,
+    ThermalRegime,
+    ThermalState,
+    adjust_wear_rate_for_temperature,
+    compute_thermal_degradation_report,
+    compute_thermal_state,
+    format_thermal_report,
+    predict_pressure_from_temperature,
+)
 
 __all__ = [
     "Decision",
@@ -58,4 +92,34 @@ __all__ = [
     "Urgency",
     "compute_forecasts",
     "format_forecast",
+    # Phase 5 enhancements: non-linear wear
+    "NonLinearFit",
+    "NonLinearWearReport",
+    "WearModel",
+    "fit_nonlinear_wear",
+    "format_nonlinear_report",
+    # Phase 5 enhancements: asymmetric wear
+    "AsymmetryReport",
+    "AsymmetryType",
+    "CornerAnalysis",
+    "Severity",
+    "detect_asymmetry",
+    "format_asymmetry_report",
+    # Phase 5 enhancements: anomaly detection
+    "AnomalyEvent",
+    "AnomalyReport",
+    "AnomalySeverity",
+    "AnomalyType",
+    "detect_anomalies",
+    "format_anomaly_report",
+    # Phase 5 enhancements: thermal degradation
+    "ThermalDegradationReport",
+    "ThermalModelConfig",
+    "ThermalRegime",
+    "ThermalState",
+    "adjust_wear_rate_for_temperature",
+    "compute_thermal_degradation_report",
+    "compute_thermal_state",
+    "format_thermal_report",
+    "predict_pressure_from_temperature",
 ]
