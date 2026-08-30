@@ -33,3 +33,6 @@ desktop.ini
 
 # Freebuff
 .freebuff/
+
+# vendored CDN assets for the offline build (regenerate: python scripts/build_offline.py)
+frontend/vendor/

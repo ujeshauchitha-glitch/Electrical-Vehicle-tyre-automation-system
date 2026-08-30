@@ -1,0 +1,2747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EV Tyre Intelligence — 3D Digital Twin</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+/* ==========================================================================
+   Instrument palette — neutral graphite ground, one muted steel-blue accent,
+   one bronze secondary, semantic status colours only. No neon, no glow.
+   ========================================================================== */
+:root {
+  --bg:        #0f1114;
+  --bg-deep:   #0a0b0d;
+  --panel:     #16181d;
+  --panel-a:   rgba(22, 24, 29, 0.82);
+  --border:    rgba(255, 255, 255, 0.07);
+  --border-hi: rgba(255, 255, 255, 0.15);
+
+  --accent:     #6fa8d4;   /* steel blue — primary data colour */
+  --accent-dim: #3f6a8a;
+  --accent2:    #a8836a;   /* bronze — secondary / annotation */
+
+  --ok:   #6ebf8b;
+  --warn: #d4a24c;
+  --bad:  #cf6a5c;
+
+  --txt:     #dde1e6;
+  --txt-dim: #969ca5;
+  --txt-mut: #656b74;
+
+  --font-h: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+  --font-m: 'JetBrains Mono', ui-monospace, 'SF Mono', Consolas, monospace;
+
+  --r-sm: 6px;
+  --r-md: 10px;
+}
+
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+html, body {
+  height:100%; width:100%;
+  background: var(--bg);
+  color: var(--txt);
+  font-family: var(--font-h);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+button, select, input { font-family: inherit; color: inherit; }
+button { cursor:pointer; border:none; background:none; }
+
+.glass, .badge, .tab-btn, .icon-btn, .play-btn, .tyre-card,
+.sensor-row, .stat-block, .wear-fill, .vr-fill, select {
+  transition: all 0.3s ease;
+}
+
+/* ---------- surfaces ------------------------------------------------------ */
+.glass {
+  background: var(--panel-a);
+  backdrop-filter: blur(20px) saturate(115%);
+  -webkit-backdrop-filter: blur(20px) saturate(115%);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+.glass-strong {
+  background: rgba(15,17,20,0.94);
+  backdrop-filter: blur(20px) saturate(115%);
+  -webkit-backdrop-filter: blur(20px) saturate(115%);
+  border-bottom: 1px solid var(--border);
+}
+
+.mono { font-family: var(--font-m); font-variant-numeric: tabular-nums; font-feature-settings:'tnum' 1; }
+.dim  { color: var(--txt-dim); }
+.mut  { color: var(--txt-mut); }
+
+/* ---------- top bar ------------------------------------------------------- */
+#topbar {
+  display:flex; align-items:center; justify-content:space-between; gap:18px;
+  padding:9px 16px; flex-shrink:0; position:relative; z-index:20;
+}
+.logo { font-size:16px; font-weight:600; letter-spacing:1.6px; color:var(--txt); }
+.logo .accent { color:var(--accent); }
+
+.badge {
+  display:inline-flex; align-items:center; gap:5px;
+  padding:2.5px 9px; border-radius:4px;
+  font-family:var(--font-m); font-size:10px; font-weight:500; letter-spacing:0.3px;
+  white-space:nowrap;
+}
+.badge-accent { background:rgba(111,168,212,0.09); color:var(--accent);  border:1px solid rgba(111,168,212,0.24); }
+.badge-bronze { background:rgba(168,131,106,0.09); color:var(--accent2); border:1px solid rgba(168,131,106,0.24); }
+.badge-ok     { background:rgba(110,191,139,0.09); color:var(--ok);      border:1px solid rgba(110,191,139,0.24); }
+.badge-warn   { background:rgba(212,162,76,0.09);  color:var(--warn);    border:1px solid rgba(212,162,76,0.26); }
+.badge-bad    { background:rgba(207,106,92,0.09);  color:var(--bad);     border:1px solid rgba(207,106,92,0.26); }
+.badge-mut    { background:rgba(255,255,255,0.035);color:var(--txt-dim); border:1px solid var(--border); }
+a.badge { text-decoration:none; }
+a.badge:hover { border-color:var(--border-hi); }
+
+.ctrl-group { display:flex; align-items:center; gap:8px; }
+.ctrl-label {
+  font-family:var(--font-m); font-size:9.5px; letter-spacing:1.1px;
+  color:var(--txt-mut); text-transform:uppercase; white-space:nowrap;
+}
+.ctrl-val {
+  font-family:var(--font-m); font-size:11.5px; color:var(--txt);
+  font-variant-numeric:tabular-nums; text-align:right;
+}
+
+select {
+  background:var(--panel); border:1px solid var(--border); border-radius:var(--r-sm);
+  padding:5px 9px; font-family:var(--font-m); font-size:11px; outline:none;
+}
+select:hover { border-color:var(--border-hi); }
+select:focus { border-color:var(--accent); }
+
+input[type=range] {
+  -webkit-appearance:none; appearance:none; height:3px; border-radius:2px;
+  background:rgba(255,255,255,0.11); outline:none; cursor:pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance:none; appearance:none; width:11px; height:11px; border-radius:50%;
+  background:var(--accent); cursor:pointer; transition:transform 0.3s ease;
+}
+input[type=range]::-webkit-slider-thumb:hover { transform:scale(1.2); }
+input[type=range]::-moz-range-thumb {
+  width:11px; height:11px; border:none; border-radius:50%; background:var(--accent);
+}
+
+.icon-btn {
+  width:28px; height:28px; border-radius:var(--r-sm); border:1px solid var(--border);
+  background:rgba(255,255,255,0.025); color:var(--txt-dim);
+  display:flex; align-items:center; justify-content:center; font-size:13px;
+}
+.icon-btn:hover  { border-color:var(--border-hi); color:var(--txt); }
+.icon-btn.active { border-color:var(--accent-dim); color:var(--accent); background:rgba(111,168,212,0.09); }
+
+.play-btn {
+  width:30px; height:30px; border-radius:var(--r-sm); border:1px solid var(--accent-dim);
+  background:rgba(111,168,212,0.09); color:var(--accent);
+  display:flex; align-items:center; justify-content:center; font-size:11px;
+}
+.play-btn:hover { background:rgba(111,168,212,0.16); }
+
+/* ---------- distance strip ------------------------------------------------ */
+#diststrip {
+  display:flex; align-items:center; gap:14px;
+  padding:6px 16px; flex-shrink:0; position:relative; z-index:15;
+  border-bottom:1px solid var(--border); background:rgba(15,17,20,0.55);
+}
+
+/* ---------- main split ---------------------------------------------------- */
+#main { display:flex; flex:1; min-height:0; gap:10px; padding:10px; position:relative; z-index:5; }
+
+#viewport {
+  position:relative; flex:1; min-width:0;
+  border:1px solid var(--border-hi); border-radius:var(--r-md);
+  overflow:hidden; background:var(--bg-deep);
+  box-shadow:0 10px 34px rgba(0,0,0,0.42);
+}
+#viewport-inner { position:relative; width:100%; height:100%; }
+#three-canvas { display:block; width:100%; height:100%; }
+
+/* ---------- floating tyre cards ------------------------------------------- */
+.tyre-card {
+  position:absolute; width:162px; padding:8px 10px; pointer-events:none;
+  background:rgba(14,16,20,0.80);
+  backdrop-filter:blur(20px) saturate(115%); -webkit-backdrop-filter:blur(20px) saturate(115%);
+  border:1px solid var(--border); border-radius:var(--r-md);
+}
+.tyre-card .corner {
+  font-family:var(--font-m); font-size:9.5px; letter-spacing:1.3px;
+  color:var(--txt-mut); text-transform:uppercase;
+}
+.tyre-card .tread-big {
+  font-family:var(--font-m); font-size:20px; font-weight:600; line-height:1.2;
+  font-variant-numeric:tabular-nums;
+}
+.tyre-card .unit { font-size:10.5px; font-weight:400; color:var(--txt-mut); margin-left:3px; }
+.tyre-card .sub {
+  font-family:var(--font-m); font-size:10px; color:var(--txt-dim);
+  font-variant-numeric:tabular-nums; margin-top:3px;
+}
+.life-row { display:flex; align-items:center; gap:5px; margin-top:5px; }
+.life-k { font-family:var(--font-m); font-size:8.5px; letter-spacing:1px; color:var(--txt-mut); }
+.life-bar { flex:1; height:4px; border-radius:2px; background:rgba(255,255,255,0.08); overflow:hidden; }
+.life-fill { height:100%; border-radius:2px; width:0%; transition:width 0.3s ease, background 0.3s ease; }
+.life-v { font-family:var(--font-m); font-size:9.5px; color:var(--txt-dim); min-width:26px; text-align:right; }
+.wear-bar { height:4px; border-radius:2px; background:rgba(255,255,255,0.08); overflow:hidden; margin:6px 0 2px; }
+.wear-fill { height:100%; border-radius:2px; width:100%; }
+
+#card-FL { top:12px;  left:12px;  }
+#card-FR { top:12px;  right:12px; }
+#card-RL { bottom:12px; left:12px; }
+#card-RR { bottom:12px; right:12px; }
+
+#cam-cluster { position:absolute; top:12px; left:50%; transform:translateX(-50%); display:flex; gap:5px; }
+
+#hud {
+  position:absolute; bottom:12px; left:50%; transform:translateX(-50%);
+  display:flex; gap:16px; padding:6px 14px;
+  background:rgba(14,16,20,0.80); backdrop-filter:blur(20px);
+  border:1px solid var(--border); border-radius:var(--r-sm);
+  font-family:var(--font-m); font-size:10.5px; color:var(--txt-dim);
+  font-variant-numeric:tabular-nums;
+}
+#hud b { color:var(--txt); font-weight:500; }
+
+/* ---------- right sidebar ------------------------------------------------- */
+#sidebar { width:288px; flex-shrink:0; display:flex; flex-direction:column; gap:9px; overflow-y:auto; }
+.panel { padding:11px 12px; }
+.panel-title {
+  font-family:var(--font-m); font-size:9px; letter-spacing:1.4px;
+  color:var(--txt-mut); text-transform:uppercase; margin-bottom:8px;
+  display:flex; align-items:center; justify-content:space-between;
+}
+.sensor-row {
+  display:flex; align-items:center; gap:7px; padding:3px 0;
+  font-family:var(--font-m); font-size:10.5px; color:var(--txt-dim);
+}
+.dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+.dot.on  { background:var(--ok); }
+.dot.off { background:var(--bad); }
+.dot.na  { background:var(--txt-mut); }
+
+.stat-grid { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
+.stat-block {
+  background:rgba(255,255,255,0.022); border:1px solid var(--border);
+  border-radius:var(--r-sm); padding:7px 9px;
+}
+.stat-block .k {
+  font-family:var(--font-m); font-size:8.5px; letter-spacing:1px;
+  color:var(--txt-mut); text-transform:uppercase;
+}
+.stat-block .v {
+  font-family:var(--font-m); font-size:17px; font-weight:600; line-height:1.3;
+  font-variant-numeric:tabular-nums; color:var(--txt);
+}
+.stat-block .v.sm { font-size:13px; }
+.stat-block.ok  { border-color:rgba(110,191,139,0.26); }
+.stat-block.ok  .v { color:var(--ok); }
+.stat-block.bad { border-color:rgba(207,106,92,0.26); }
+.stat-block.bad .v { color:var(--bad); }
+
+.kv { display:flex; align-items:center; justify-content:space-between; padding:3px 0;
+      font-family:var(--font-m); font-size:10.5px; border-bottom:1px solid rgba(255,255,255,0.03); }
+.kv:last-child { border-bottom:none; }
+.kv .k { color:var(--txt-dim); }
+.kv .v { color:var(--txt); font-variant-numeric:tabular-nums; }
+
+/* ---------- bottom panel + tabs ------------------------------------------- */
+#bottom { flex-shrink:0; margin:0 10px 10px; display:flex; flex-direction:column; height:210px; position:relative; z-index:5; }
+#tabbar { display:flex; align-items:center; gap:2px; border-bottom:1px solid var(--border); padding:0 6px; }
+.tab-btn {
+  padding:8px 14px; font-family:var(--font-m); font-size:11px; letter-spacing:0.3px;
+  color:var(--txt-mut); border-bottom:1px solid transparent; margin-bottom:-1px;
+}
+.tab-btn:hover { color:var(--txt); }
+.tab-btn.active { color:var(--accent); border-bottom-color:var(--accent); }
+.tab-panes { flex:1; overflow-y:auto; padding:10px 13px; }
+.tab-pane { display:none; }
+.tab-pane.active { display:block; animation:fadeUp 0.3s ease; }
+@keyframes fadeUp { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }
+
+table.dt { width:100%; border-collapse:collapse; font-family:var(--font-m); font-size:10.5px; }
+table.dt th {
+  text-align:left; color:var(--txt-mut); font-weight:500; padding:5px 8px;
+  border-bottom:1px solid var(--border); letter-spacing:0.6px; text-transform:uppercase; font-size:9px;
+  position:sticky; top:0; background:rgba(15,17,20,0.96);
+}
+table.dt td { padding:5px 8px; border-bottom:1px solid rgba(255,255,255,0.028); font-variant-numeric:tabular-nums; }
+table.dt td.num { text-align:right; color:var(--txt); }
+table.dt td.sig { text-align:right; color:var(--txt-dim); }
+table.dt tr:hover td { background:rgba(255,255,255,0.018); }
+
+.vr-track { height:11px; border-radius:2px; background:rgba(255,255,255,0.05); overflow:hidden; flex:1; }
+.vr-fill  { height:100%; border-radius:2px; width:0%; }
+
+.note { border-radius:var(--r-sm); padding:8px 11px; font-family:var(--font-m); font-size:10px; line-height:1.65; margin-top:9px; }
+.note-warn { background:rgba(212,162,76,0.06); border:1px solid rgba(212,162,76,0.20); color:var(--warn); }
+.note-info { background:rgba(111,168,212,0.06); border:1px solid rgba(111,168,212,0.20); color:var(--accent); }
+
+.eqn {
+  font-family:var(--font-m); font-size:11px; color:var(--txt);
+  background:rgba(255,255,255,0.022); border:1px solid var(--border);
+  border-left:2px solid var(--accent-dim); border-radius:var(--r-sm);
+  padding:8px 10px; margin:5px 0; white-space:pre-wrap; line-height:1.6;
+}
+.eqn .cap { display:block; color:var(--txt-mut); font-size:9.5px; margin-top:4px; }
+
+/* ---------- boot / error overlays ---------------------------------------- */
+#boot {
+  position:fixed; inset:0; z-index:200; background:var(--bg);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px;
+  transition:opacity 0.3s ease;
+}
+#boot.hidden { opacity:0; pointer-events:none; }
+.spinner {
+  width:30px; height:30px; border-radius:50%;
+  border:2px solid rgba(111,168,212,0.16); border-top-color:var(--accent);
+  animation:spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform:rotate(360deg); } }
+#boot-msg { font-family:var(--font-m); font-size:10.5px; color:var(--txt-dim); letter-spacing:1.1px; }
+
+#fatal { position:fixed; inset:0; z-index:300; display:none; align-items:center; justify-content:center; padding:40px; background:var(--bg); }
+#fatal.show { display:flex; }
+
+::-webkit-scrollbar { width:7px; height:7px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.09); border-radius:4px; }
+::-webkit-scrollbar-thumb:hover { background:rgba(255,255,255,0.18); }
+</style>
+</head>
+
+<body>
+
+<div id="boot">
+  <div class="spinner"></div>
+  <div id="boot-msg">INITIALISING SCENE…</div>
+</div>
+
+<div id="fatal">
+  <div class="glass" style="max-width:620px;padding:24px 28px;">
+    <div style="font-size:16px;font-weight:600;color:var(--bad);margin-bottom:8px;">WebGL / three.js unavailable</div>
+    <div class="mono dim" style="font-size:11.5px;line-height:1.7;">
+      The 3D viewport could not start. The estimator does not depend on WebGL —
+      the 2D fallback dashboard is wired in Phase 5.
+      <div id="fatal-detail" style="margin-top:10px;color:var(--txt-mut);"></div>
+    </div>
+  </div>
+</div>
+
+<div id="app" style="display:flex;flex-direction:column;height:100vh;position:relative;z-index:1;">
+
+  <!-- ====================== TOP BAR ====================== -->
+  <div id="topbar" class="glass-strong">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      <span class="logo">TYRE_INTEL<span class="accent">_EV</span></span>
+      <span class="badge badge-accent">Phase 6 Digital Twin — v6.0.0</span>
+      <span class="badge badge-ok">441 tests</span>
+      <a class="badge badge-bronze" id="dataset-link" href="https://data.mendeley.com/" target="_blank" rel="noopener noreferrer">Mendeley validated</a>
+      <span class="badge badge-warn">UNVALIDATED · simulation</span>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+      <div class="ctrl-group">
+        <span class="ctrl-label">Scenario</span>
+        <select id="scenario-select" style="min-width:148px;"></select>
+      </div>
+      <div class="ctrl-group">
+        <span class="ctrl-label">Speed</span>
+        <input type="range" id="speed-slider" min="0" max="50" step="0.5" value="20" style="width:92px;">
+        <span class="ctrl-val" id="speed-val" style="min-width:66px;">20.0 m/s</span>
+      </div>
+      <div class="ctrl-group">
+        <span class="ctrl-label">Ambient</span>
+        <input type="range" id="temp-slider" min="-10" max="50" step="1" value="25" style="width:74px;">
+        <span class="ctrl-val" id="temp-val" style="min-width:40px;">25 °C</span>
+      </div>
+      <div class="ctrl-group">
+        <span class="ctrl-label">Package</span>
+        <div style="display:flex;gap:3px;">
+          <button class="icon-btn active" data-pkg="base" style="width:auto;padding:0 9px;font-size:10px;font-family:var(--font-m);" title="Base sensor package">BASE</button>
+          <button class="icon-btn" data-pkg="extended" style="width:auto;padding:0 9px;font-size:10px;font-family:var(--font-m);" title="Extended: + road load, + lateral accel (P)">EXT</button>
+        </div>
+        <button class="play-btn" id="play-btn" title="Play / pause (Space)">❚❚</button>
+        <button class="icon-btn" id="reset-btn" title="Reset scenario (R)">⟲</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================== DISTANCE STRIP ====================== -->
+  <div id="diststrip">
+    <span class="ctrl-label" style="min-width:62px;">Distance</span>
+    <input type="range" id="dist-slider" min="0" max="1000" step="0.5" value="0" style="flex:1;">
+    <span class="ctrl-val" id="dist-val" style="min-width:84px;">0.0 km</span>
+    <span class="mono mut" style="font-size:10px;">/ 1000 km</span>
+
+    <span style="width:1px;height:16px;background:var(--border);"></span>
+
+    <span class="ctrl-label">Toe (true)</span>
+    <input type="range" id="toe-slider" min="0" max="3" step="0.05" value="0.32" style="width:82px;">
+    <span class="ctrl-val" id="toe-val" style="min-width:44px;">0.32°</span>
+
+    <span class="ctrl-label">Camber (true)</span>
+    <input type="range" id="camber-slider" min="-4" max="4" step="0.1" value="0" style="width:82px;">
+    <span class="ctrl-val" id="camber-val" style="min-width:44px;">0.00°</span>
+  </div>
+
+  <!-- ====================== MAIN ====================== -->
+  <div id="main">
+
+    <div id="viewport">
+      <div id="viewport-inner">
+        <canvas id="three-canvas"></canvas>
+
+        <div id="cam-cluster">
+          <button class="icon-btn active" id="cam-orbit" title="Orbit camera (C)">◎</button>
+          <button class="icon-btn" id="cam-front" title="Fixed front view (C)">▣</button>
+        </div>
+
+        <div class="tyre-card" id="card-FL">
+          <div class="corner">FL — front left</div>
+          <div class="tread-big" id="tread-FL">—<span class="unit">mm</span></div>
+          <div class="wear-bar"><div class="wear-fill" id="wear-FL" style="background:var(--ok);"></div></div>
+          <div class="sub" id="sub-FL">— kPa · — °C</div>
+          <div class="sub" id="psig-FL" style="color:var(--txt-mut);">—</div>
+          <div class="life-row"><span class="life-k">LIFE</span><div class="life-bar"><div class="life-fill" id="life-FL"></div></div><span class="life-v" id="lifepct-FL">—</span></div>
+          <div class="sub" id="rul-FL" style="color:var(--txt-mut);">—</div>
+          <div style="margin-top:4px;display:none;" id="obswrap-FL"><span class="badge badge-warn" id="obs-FL">WEAK</span><span class="sub" id="tsig-FL" style="margin:0 0 0 6px;">—</span></div>
+        </div>
+        <div class="tyre-card" id="card-FR">
+          <div class="corner">FR — front right</div>
+          <div class="tread-big" id="tread-FR">—<span class="unit">mm</span></div>
+          <div class="wear-bar"><div class="wear-fill" id="wear-FR" style="background:var(--ok);"></div></div>
+          <div class="sub" id="sub-FR">— kPa · — °C</div>
+          <div class="sub" id="psig-FR" style="color:var(--txt-mut);">—</div>
+          <div class="life-row"><span class="life-k">LIFE</span><div class="life-bar"><div class="life-fill" id="life-FR"></div></div><span class="life-v" id="lifepct-FR">—</span></div>
+          <div class="sub" id="rul-FR" style="color:var(--txt-mut);">—</div>
+          <div style="margin-top:4px;display:none;" id="obswrap-FR"><span class="badge badge-warn" id="obs-FR">WEAK</span><span class="sub" id="tsig-FR" style="margin:0 0 0 6px;">—</span></div>
+        </div>
+        <div class="tyre-card" id="card-RL">
+          <div class="corner">RL — rear left</div>
+          <div class="tread-big" id="tread-RL">—<span class="unit">mm</span></div>
+          <div class="wear-bar"><div class="wear-fill" id="wear-RL" style="background:var(--ok);"></div></div>
+          <div class="sub" id="sub-RL">— kPa · — °C</div>
+          <div class="sub" id="psig-RL" style="color:var(--txt-mut);">—</div>
+          <div class="life-row"><span class="life-k">LIFE</span><div class="life-bar"><div class="life-fill" id="life-RL"></div></div><span class="life-v" id="lifepct-RL">—</span></div>
+          <div class="sub" id="rul-RL" style="color:var(--txt-mut);">—</div>
+          <div style="margin-top:4px;display:none;" id="obswrap-RL"><span class="badge badge-warn" id="obs-RL">WEAK</span><span class="sub" id="tsig-RL" style="margin:0 0 0 6px;">—</span></div>
+        </div>
+        <div class="tyre-card" id="card-RR">
+          <div class="corner">RR — rear right</div>
+          <div class="tread-big" id="tread-RR">—<span class="unit">mm</span></div>
+          <div class="wear-bar"><div class="wear-fill" id="wear-RR" style="background:var(--ok);"></div></div>
+          <div class="sub" id="sub-RR">— kPa · — °C</div>
+          <div class="sub" id="psig-RR" style="color:var(--txt-mut);">—</div>
+          <div class="life-row"><span class="life-k">LIFE</span><div class="life-bar"><div class="life-fill" id="life-RR"></div></div><span class="life-v" id="lifepct-RR">—</span></div>
+          <div class="sub" id="rul-RR" style="color:var(--txt-mut);">—</div>
+          <div style="margin-top:4px;display:none;" id="obswrap-RR"><span class="badge badge-warn" id="obs-RR">WEAK</span><span class="sub" id="tsig-RR" style="margin:0 0 0 6px;">—</span></div>
+        </div>
+
+        <div id="hud">
+          <span class="mut" title="The 3D vehicle renders the SIMULATED GROUND TRUTH. The cards and panels show the estimator's output.">3D = TRUTH</span>
+          <span>SPEED <b id="hud-speed">—</b></span>
+          <span>DIST <b id="hud-dist">—</b></span>
+          <span>TOE <b id="hud-toe">—</b></span>
+          <span>CAMBER <b id="hud-camber">—</b></span>
+        </div>
+      </div>
+    </div>
+
+    <div id="sidebar">
+      <div class="panel glass">
+        <div class="panel-title"><span>Sensor availability</span><span class="mono" id="sensor-count" style="color:var(--ok);">—</span></div>
+        <div id="sensor-list"></div>
+
+        <div class="panel-title" style="margin-top:11px;">Hypothetical channels</div>
+        <label class="sensor-row" style="cursor:pointer;">
+          <input type="checkbox" id="ch-roadload" style="accent-color:var(--accent);width:12px;height:12px;">
+          <span>Road load from motor torque</span>
+        </label>
+        <label class="sensor-row" style="cursor:pointer;">
+          <input type="checkbox" id="ch-lateral" style="accent-color:var(--accent);width:12px;height:12px;">
+          <span>Lateral accelerometer</span>
+        </label>
+        <div class="mono mut" style="font-size:9px;line-height:1.55;margin-top:6px;">
+          Both are OFF by default — the vehicle is not claimed to measure either.
+          Enabling one asks what a channel the system does not have would buy.
+          <div id="pkg-note" style="margin-top:5px;color:var(--txt-dim);"></div>
+        </div>
+
+        <div class="panel-title" style="margin-top:11px;">Tread prior</div>
+        <label class="sensor-row" style="cursor:pointer;">
+          <input type="checkbox" id="pr-fitment" style="accent-color:var(--accent);width:12px;height:12px;">
+          <span>Known fitment (7.5 mm ± 0.5)</span>
+        </label>
+        <div class="mono mut" style="font-size:9px;line-height:1.55;margin-top:4px;">
+          Off = midpoint prior 4.55 mm ± 2.5, as in estimator.py. The absolute tread
+          level is not measured, so it stays at whichever prior you pick — this
+          changes the NUMBER, not the observability.
+        </div>
+      </div>
+
+      <div class="panel glass">
+        <div class="panel-title"><span>Tyre life remaining</span></div>
+        <div id="life-body"></div>
+      </div>
+
+      <div class="panel glass">
+        <div class="panel-title">Estimator status</div>
+        <div class="stat-grid">
+          <div class="stat-block"><div class="k">States observed</div><div class="v" id="stat-observed">—</div></div>
+          <div class="stat-block"><div class="k">Measurements</div><div class="v" id="stat-meas">—</div></div>
+          <div class="stat-block" id="stat-conv-block"><div class="k">Converged</div><div class="v sm" id="stat-converged">—</div></div>
+          <div class="stat-block"><div class="k">Iterations</div><div class="v" id="stat-iters">—</div></div>
+        </div>
+        <div style="margin-top:8px;">
+          <div class="kv"><span class="k">Mean variance reduction</span><span class="v" id="stat-vr">—</span></div>
+          <div class="kv"><span class="k">Model version</span><span class="v">3.0.0</span></div>
+        </div>
+      </div>
+
+      <div class="panel glass">
+        <div class="panel-title">Active scenario</div>
+        <div class="mono" id="scenario-name" style="font-size:13px;font-weight:600;color:var(--accent);">—</div>
+        <div id="scenario-detail" style="margin-top:7px;"></div>
+      </div>
+
+      <div class="panel glass">
+        <div class="panel-title">Renderer</div>
+        <div class="kv"><span class="k">three.js</span><span class="v" id="rt-three">—</span></div>
+        <div class="kv"><span class="k">Canvas</span><span class="v" id="rt-size">—</span></div>
+        <div class="kv"><span class="k">Pixel ratio</span><span class="v" id="rt-dpr">—</span></div>
+        <div class="kv"><span class="k">Draw calls</span><span class="v" id="rt-calls">—</span></div>
+        <div class="kv"><span class="k">Triangles</span><span class="v" id="rt-tris">—</span></div>
+        <div class="kv"><span class="k">FPS</span><span class="v" id="rt-fps">—</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================== BOTTOM PANEL ====================== -->
+  <div id="bottom" class="glass">
+    <div id="tabbar">
+      <button class="tab-btn active" data-tab="estimator">Estimator</button>
+      <button class="tab-btn" data-tab="observability">Observability</button>
+      <button class="tab-btn" data-tab="accuracy">Accuracy</button>
+      <button class="tab-btn" data-tab="wear">Wear &amp; Life</button>
+      <button class="tab-btn" data-tab="physics">Physics</button>
+    </div>
+    <div class="tab-panes">
+      <div class="tab-pane active" id="pane-estimator">
+        <div class="mono mut" style="font-size:10.5px;">Estimator state table — wired in Phase 3.</div>
+      </div>
+      <div class="tab-pane" id="pane-observability">
+        <div class="mono mut" style="font-size:10.5px;">Variance-reduction bars — wired in Phase 3.</div>
+      </div>
+      <div class="tab-pane" id="pane-accuracy"></div>
+      <div class="tab-pane" id="pane-wear"></div>
+      <div class="tab-pane" id="pane-physics"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+'use strict';
+/* ==========================================================================
+   PHASE 1 — scene, renderer, camera, controls, lights, fog
+   PHASE 2 — road, environment, car body, four tyre assemblies
+   ========================================================================== */
+
+const C = {
+  bg:        0x0f1114,
+  fog:       0x0b0d10,
+  accent:    0x6fa8d4,
+  accent2:   0xa8836a,
+  ok:        0x6ebf8b,
+  warn:      0xd4a24c,
+  bad:       0xcf6a5c,
+  asphalt:   0x1a1a1c,
+  laneWhite: 0xd2d4d0,
+  laneEdge:  0xb2954c,
+  mirror:    0x0b0c0e,
+  building:  0x15181d,
+  window:    0xc9a86a,
+  star:      0xc4ccd6,
+  carBody:   0x252b34,
+  glass:     0x9fc0d8,
+  headlight: 0xfff0d0,
+  taillight: 0xd94a3a,
+  rubber:    0x1e2022,
+  tread:     0x141618,
+  hub:       0x8a9099
+};
+
+/* ---- geometry constants (single source of truth) ------------------------ */
+const ROAD_HALF   = 90;    // road runs z = -90 .. +90
+const ROAD_SPAN   = ROAD_HALF * 2;
+const DASH_PERIOD = 4.0;   // 2.0 m dash + 2.0 m gap
+const BUMP_PERIOD = 200;   // one speed bump every 200 m of travel
+
+/* Two-lane layout, 3.7 m lanes. The vehicle occupies the right-hand lane
+   centred on x = 0, so the centre line runs down its left side rather than
+   underneath it. */
+const LANE_W    = 3.7;
+const CENTRE_X  = -LANE_W / 2;          // white dashed centre line
+const EDGE_R_X  =  LANE_W / 2;          // yellow right-hand edge
+const EDGE_L_X  = -LANE_W * 1.5;        // yellow far edge of the opposing lane
+const ROAD_MID  = (EDGE_R_X + EDGE_L_X) / 2;
+const ROAD_W    = (EDGE_R_X - EDGE_L_X) + 1.6;   // plus shoulders
+const POLE_GAP  = 18;                   // roadside pole spacing (m)
+const TYRE_R      = 0.33;   // OUTER radius of the finished assembly
+const TYRE_W      = 0.22;
+const RIB_TUBE    = 0.015;
+const CARCASS_R   = TYRE_R - RIB_TUBE;   // tread ribs stand proud of the carcass,
+const RIB_R       = TYRE_R - RIB_TUBE;   // so their outer surface lands on TYRE_R
+const CAR_BASE_Y  = 0.0;   // tyre bottoms sit exactly on the road plane at y=0
+const SUSP_CLAMP  = 0.05;  // body never leaves ±0.05 of its baseline
+
+const TYRE_POS = [
+  [-0.85, TYRE_R,  1.4],   // FL
+  [ 0.85, TYRE_R,  1.4],   // FR
+  [-0.85, TYRE_R, -1.4],   // RL
+  [ 0.85, TYRE_R, -1.4]    // RR
+];
+const CORNERS = ['FL', 'FR', 'RL', 'RR'];
+
+let scene, camera, renderer, controls;
+let viewportEl, canvasEl;
+
+/* Phase 2 scene handles, consumed by Phase 3/4 */
+let carGroup, bodyGroup;
+let tyres = [], tyreSpins = [], tyreGlows = [], tyreMats = [];
+let roadGroup, dashes = [], bumpMesh, bumpZ = ROAD_HALF;
+let scrollers = [];        // everything that translates in -Z with the vehicle
+
+function fatal(msg) {
+  document.getElementById('boot').classList.add('hidden');
+  document.getElementById('fatal').classList.add('show');
+  const d = document.getElementById('fatal-detail');
+  if (d) d.textContent = msg;
+  console.error('[tyre3d]', msg);
+  // the estimator is plain arithmetic and does not need WebGL
+  try {
+    if (typeof startFallbackDashboard === 'function') {
+      startFallbackDashboard();
+      const r = document.getElementById('fb-reason');
+      if (r) r.textContent = msg;
+    }
+  } catch (e) { console.error('[tyre3d] fallback failed', e); }
+}
+
+/* ==========================================================================
+   PHASE 1 — core scene
+   ========================================================================== */
+function initThree() {
+  viewportEl = document.getElementById('viewport-inner');
+  canvasEl   = document.getElementById('three-canvas');
+
+  const w = viewportEl.clientWidth || 1;
+  const h = viewportEl.clientHeight || 1;
+
+  renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: true, alpha: false });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(w, h, false);
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 0.9;
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.setClearColor(C.bg, 1);
+
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(C.bg);
+  scene.fog = new THREE.FogExp2(C.fog, 0.012);
+
+  camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 1000);
+  camera.position.set(8, 4, 10);
+  camera.lookAt(0, 0.5, 0);
+
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.05;
+  controls.minDistance = 3;
+  controls.maxDistance = 25;
+  controls.maxPolarAngle = Math.PI / 2.1;
+  controls.target.set(0, 0.5, 0);   // set ONCE — never reassigned
+  controls.update();
+
+  scene.add(new THREE.AmbientLight(0x2a3038, 0.5));
+  const dir = new THREE.DirectionalLight(0xfff6e8, 0.7);
+  dir.position.set(5, 10, 5);
+  scene.add(dir);
+  scene.add(new THREE.HemisphereLight(0x1c222b, 0x0a0b0d, 0.3));
+
+  // Rim light from the opposite side. Without it the metallic shell collapses
+  // into a silhouette against the road and the tyre corners are unreadable —
+  // which defeats the point of colour-coding the tyres by tread state.
+  const rim = new THREE.DirectionalLight(0x9fc4e8, 0.45);
+  rim.position.set(-7, 4, -6);
+  scene.add(rim);
+
+  buildEnvironmentMap();
+}
+
+/* A procedural sky gradient used as scene.environment. Without it, the
+   metalness on the mirror ground and the wheel hubs renders as flat black —
+   metals reflect the environment and there is nothing else to reflect.
+   Procedurally generated: no external asset. */
+function buildEnvironmentMap() {
+  const cv = document.createElement('canvas');
+  cv.width = 8; cv.height = 128;
+  const g = cv.getContext('2d');
+  const grad = g.createLinearGradient(0, 0, 0, 128);
+  grad.addColorStop(0.00, '#1a2029');
+  grad.addColorStop(0.48, '#12161b');
+  grad.addColorStop(0.52, '#0c0e11');
+  grad.addColorStop(1.00, '#08090b');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 8, 128);
+
+  const tex = new THREE.CanvasTexture(cv);
+  tex.mapping = THREE.EquirectangularReflectionMapping;
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  pmrem.compileEquirectangularShader();
+  scene.environment = pmrem.fromEquirectangular(tex).texture;
+  tex.dispose();
+  pmrem.dispose();
+}
+
+/* ==========================================================================
+   PHASE 2 — road
+   ========================================================================== */
+function buildRoad() {
+  roadGroup = new THREE.Group();
+
+  const asphalt = new THREE.Mesh(
+    new THREE.PlaneGeometry(ROAD_W, ROAD_SPAN),
+    new THREE.MeshStandardMaterial({ color: C.asphalt, roughness: 0.8, metalness: 0.0 })
+  );
+  asphalt.rotation.x = -Math.PI / 2;
+  asphalt.position.set(ROAD_MID, 0.001, 0);
+  roadGroup.add(asphalt);
+
+  // dashed centre line — individual boxes on a 4 m period, recycled each frame
+  const dashGeo = new THREE.BoxGeometry(0.16, 0.012, 2.0);
+  const dashMat = new THREE.MeshStandardMaterial({
+    color: C.laneWhite, roughness: 0.55, emissive: C.laneWhite, emissiveIntensity: 0.05
+  });
+  const nDash = Math.floor(ROAD_SPAN / DASH_PERIOD);
+  for (let i = 0; i < nDash; i++) {
+    const d = new THREE.Mesh(dashGeo, dashMat);
+    d.position.set(CENTRE_X, 0.012, -ROAD_HALF + i * DASH_PERIOD);
+    dashes.push(d);
+    roadGroup.add(d);
+  }
+
+  // continuous edge lines
+  const edgeGeo = new THREE.BoxGeometry(0.14, 0.012, ROAD_SPAN);
+  const edgeMat = new THREE.MeshStandardMaterial({ color: C.laneEdge, roughness: 0.6 });
+  [EDGE_L_X, EDGE_R_X].forEach(x => {
+    const e = new THREE.Mesh(edgeGeo, edgeMat);
+    e.position.set(x, 0.012, 0);
+    roadGroup.add(e);
+  });
+
+  // one recycled speed bump; its impulse is applied in Phase 3
+  bumpMesh = new THREE.Mesh(
+    new THREE.BoxGeometry(3, 0.05, 0.3),
+    new THREE.MeshStandardMaterial({ color: 0x4a3f2c, roughness: 0.7 })
+  );
+  bumpMesh.position.set(0, 0.03, bumpZ);
+  roadGroup.add(bumpMesh);
+
+  // roadside poles — the dashed line alone is a weak motion cue at speed;
+  // vertical objects passing the camera make the velocity legible
+  const poleMat  = new THREE.MeshStandardMaterial({ color: 0x2b3037, roughness: 0.6, metalness: 0.4 });
+  const lampMat  = new THREE.MeshStandardMaterial({ color: 0xffe9c0, emissive: 0xffe9c0, emissiveIntensity: 1.2 });
+  const poleGeo  = new THREE.CylinderGeometry(0.05, 0.07, 4.2, 6);
+  const armGeo   = new THREE.BoxGeometry(0.9, 0.06, 0.06);
+  const lampGeo  = new THREE.BoxGeometry(0.34, 0.08, 0.18);
+  const nPole = Math.floor(ROAD_SPAN / POLE_GAP);
+  for (let i = 0; i < nPole; i++) {
+    for (const side of [-1, 1]) {
+      const x = side > 0 ? EDGE_R_X + 1.5 : EDGE_L_X - 1.5;
+      const p = new THREE.Group();
+      const shaft = new THREE.Mesh(poleGeo, poleMat); shaft.position.y = 2.1; p.add(shaft);
+      const arm = new THREE.Mesh(armGeo, poleMat);
+      arm.position.set(-side * 0.45, 4.15, 0); p.add(arm);
+      const lamp = new THREE.Mesh(lampGeo, lampMat);
+      lamp.position.set(-side * 0.85, 4.08, 0); p.add(lamp);
+      p.position.set(x, 0, -ROAD_HALF + i * POLE_GAP);
+      scrollers.push(p);
+      roadGroup.add(p);
+    }
+  }
+
+  scene.add(roadGroup);
+}
+
+/* ==========================================================================
+   PHASE 2 — environment
+   ========================================================================== */
+function buildEnvironment() {
+  // dark reflective ground under and beside the road
+  const ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(600, 600),
+    new THREE.MeshStandardMaterial({ color: C.mirror, metalness: 0.9, roughness: 0.2 })
+  );
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = -0.02;
+  scene.add(ground);
+
+  // city skyline backdrop
+  const skyline = new THREE.Group();
+  const bMat = new THREE.MeshStandardMaterial({ color: C.building, roughness: 0.85, metalness: 0.1 });
+  const winMat = new THREE.MeshStandardMaterial({
+    color: C.window, emissive: C.window, emissiveIntensity: 0.55, roughness: 0.4
+  });
+  const rnd = mulberry32(20240830);
+  for (let i = 0; i < 26; i++) {
+    const hgt = 5 + rnd() * 15;
+    const wid = 1 + rnd() * 2;
+    const dep = 1 + rnd() * 2;
+    const b = new THREE.Mesh(new THREE.BoxGeometry(wid, hgt, dep), bMat);
+    b.position.set(-42 + rnd() * 84, hgt / 2, -30 - rnd() * 20);
+    skyline.add(b);
+
+    if (rnd() > 0.45) {
+      const rows = 2 + Math.floor(rnd() * 4);
+      for (let r = 0; r < rows; r++) {
+        const win = new THREE.Mesh(new THREE.BoxGeometry(wid * 0.5, 0.28, 0.03), winMat);
+        win.position.set(
+          b.position.x + (rnd() - 0.5) * wid * 0.3,
+          1.2 + r * (hgt / (rows + 1)),
+          b.position.z + dep / 2 + 0.02
+        );
+        skyline.add(win);
+      }
+    }
+  }
+  scene.add(skyline);
+
+  // star dome — fog disabled so distant points stay visible
+  const starPos = new Float32Array(200 * 3);
+  for (let i = 0; i < 200; i++) {
+    const theta = rnd() * Math.PI * 2;
+    const phi = Math.acos(0.15 + rnd() * 0.85);
+    const rad = 60 + rnd() * 30;
+    starPos[i * 3]     = rad * Math.sin(phi) * Math.cos(theta);
+    starPos[i * 3 + 1] = Math.abs(rad * Math.cos(phi)) + 12;
+    starPos[i * 3 + 2] = rad * Math.sin(phi) * Math.sin(theta);
+  }
+  const starGeo = new THREE.BufferGeometry();
+  starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+  scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({
+    color: C.star, size: 0.35, sizeAttenuation: true, transparent: true, opacity: 0.65, fog: false
+  })));
+}
+
+/* deterministic PRNG — the scene must be reproducible across reloads */
+function mulberry32(seed) {
+  return function () {
+    seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/* ==========================================================================
+   PHASE 2 — tyre assembly
+   --------------------------------------------------------------------------
+   Nesting matters, and so does where the pivot sits.
+
+   The outer group is placed AT ROAD LEVEL, not at the hub. Camber and load
+   deflection are both applied to it, so both pivot about the contact patch:
+   a cambered wheel rolls on its edge instead of sinking through the asphalt,
+   and a deflected tyre squashes downward while the contact patch stays put.
+   Pivoting at the hub instead makes the wheel intersect the road.
+
+   A separate inner group carries the spin, so rotating the wheel each frame
+   cannot overwrite the alignment angles.
+   ========================================================================== */
+function createTyre(x, z) {
+  const group = new THREE.Group();
+  group.position.set(x, 0, z);          // contact patch
+
+  const hub = new THREE.Group();
+  hub.position.y = TYRE_R;              // wheel centre
+  group.add(hub);
+
+  const spin = new THREE.Group();
+  hub.add(spin);
+
+  const carcassMat = new THREE.MeshStandardMaterial({
+    color: C.rubber, roughness: 0.9, metalness: 0.0,
+    emissive: 0x000000, emissiveIntensity: 0
+  });
+  const carcass = new THREE.Mesh(new THREE.CylinderGeometry(CARCASS_R, CARCASS_R, TYRE_W, 24), carcassMat);
+  carcass.rotation.z = Math.PI / 2;          // cylinder axis Y -> X
+  spin.add(carcass);
+
+  // 5 tread ribs evenly spaced across the tread width
+  const ribMat = new THREE.MeshStandardMaterial({ color: C.tread, roughness: 0.95, metalness: 0.0 });
+  const ribGeo = new THREE.TorusGeometry(RIB_R, RIB_TUBE, 8, 24);
+  for (let i = 0; i < 5; i++) {
+    const rib = new THREE.Mesh(ribGeo, ribMat);
+    rib.rotation.y = Math.PI / 2;            // torus axis Z -> X
+    rib.position.x = -TYRE_W / 2 + (TYRE_W / 4) * i;
+    spin.add(rib);
+  }
+
+  const rim = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.12, 0.12, TYRE_W + 0.02, 12),
+    new THREE.MeshStandardMaterial({ color: C.hub, metalness: 0.9, roughness: 0.3 })
+  );
+  rim.rotation.z = Math.PI / 2;
+  spin.add(rim);
+
+  // heat indicator, intensity driven by tyre temperature in Phase 4
+  const glow = new THREE.PointLight(C.ok, 0, 1.5);
+  hub.add(glow);
+
+  return { group, spin, glow, carcassMat, ribMat };
+}
+
+/* ==========================================================================
+   PHASE 2 — car
+   --------------------------------------------------------------------------
+   carGroup never moves: it is the anchor that guarantees the vehicle cannot
+   leave the frame. Suspension travel is applied to bodyGroup only, clamped to
+   ±SUSP_CLAMP, which is also physically right — the body heaves, the contact
+   patches stay on the road.
+   ========================================================================== */
+function buildCar() {
+  carGroup = new THREE.Group();
+  carGroup.position.set(0, CAR_BASE_Y, 0);
+
+  bodyGroup = new THREE.Group();
+  carGroup.add(bodyGroup);
+
+  const shellMat = new THREE.MeshStandardMaterial({
+    color: C.carBody, metalness: 0.8, roughness: 0.2,
+    envMapIntensity: 1.6
+  });
+
+  const body = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.7, 4.2), shellMat);
+  body.position.y = 0.6;
+  bodyGroup.add(body);
+
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.5, 2.0), shellMat);
+  roof.position.set(0, 1.2, -0.3);
+  bodyGroup.add(roof);
+
+  const glassMat = new THREE.MeshStandardMaterial({
+    color: C.glass, transparent: true, opacity: 0.3,
+    metalness: 0.4, roughness: 0.1, side: THREE.DoubleSide
+  });
+
+  const windshield = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.5), glassMat);
+  windshield.rotation.x = -15 * Math.PI / 180;
+  windshield.position.set(0, 1.12, 0.72);
+  bodyGroup.add(windshield);
+
+  const rearWindow = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.5), glassMat);
+  rearWindow.rotation.x = 10 * Math.PI / 180;
+  rearWindow.position.set(0, 1.12, -1.32);
+  bodyGroup.add(rearWindow);
+
+  const hlMat = new THREE.MeshStandardMaterial({
+    color: C.headlight, emissive: C.headlight, emissiveIntensity: 1.4
+  });
+  const tlMat = new THREE.MeshStandardMaterial({
+    color: C.taillight, emissive: C.taillight, emissiveIntensity: 1.1
+  });
+  [-0.7, 0.7].forEach(sx => {
+    const hl = new THREE.Mesh(new THREE.SphereGeometry(0.08, 12, 12), hlMat);
+    hl.position.set(sx, 0.5, 2.1);
+    bodyGroup.add(hl);
+    const lamp = new THREE.PointLight(0xffeecc, 0.3, 5);
+    lamp.position.set(sx, 0.5, 2.3);
+    bodyGroup.add(lamp);
+  });
+  [-0.8, 0.8].forEach(sx => {
+    const tl = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 10), tlMat);
+    tl.position.set(sx, 0.5, -2.1);
+    bodyGroup.add(tl);
+  });
+
+  const under = new THREE.PointLight(C.accent, 0.2, 3);
+  under.position.set(0, 0.2, 0);
+  bodyGroup.add(under);
+
+  TYRE_POS.forEach(([x, , z]) => {
+    const t = createTyre(x, z);
+    carGroup.add(t.group);
+    tyres.push(t.group);
+    tyreSpins.push(t.spin);
+    tyreGlows.push(t.glow);
+    tyreMats.push([t.carcassMat, t.ribMat]);
+  });
+
+  scene.add(carGroup);
+}
+
+/* Alignment hooks. Toe and camber are estimated states — Phase 3 drives these
+   from the estimator output so the geometry shows what the filter reports.
+   Angles are magnified for visibility; the readout shows the true value. */
+const ALIGN_GAIN = 3;
+function applyAlignment(toeDeg, camberDeg) {
+  const toe = (toeDeg || 0) * Math.PI / 180 * ALIGN_GAIN;
+  const cam = (camberDeg || 0) * Math.PI / 180 * ALIGN_GAIN;
+  for (let i = 0; i < 4; i++) {
+    const leftSide  = TYRE_POS[i][0] < 0;
+    const frontAxle = TYRE_POS[i][2] > 0;
+    // toe-in: each front wheel's leading edge rotates toward the centreline
+    tyres[i].rotation.y = frontAxle ? (leftSide ? toe : -toe) : 0;
+    // negative camber leans the wheel top toward the centreline
+    tyres[i].rotation.z = leftSide ? -cam : cam;
+  }
+}
+
+/* ==========================================================================
+   PHASE 3 — physics, estimator, scenarios, simulation
+   --------------------------------------------------------------------------
+   Every constant below mirrors src/evtyre/estimation/physics.py and
+   estimation/estimator.py. All of them are UNVALIDATED guesses carried over
+   from the legacy reference implementation — none has been checked against
+   bench data. They are configuration, not measured physics.
+   ========================================================================== */
+
+const PHYS = {
+  k_z0:                210000.0,   // vertical stiffness at placard pressure (N/m)
+  cornering_stiffness:  55000.0,   // C_alpha (N/rad), for toe drag
+  camber_stiffness:      4400.0,   // C_gamma (N/rad) = 0.08*C_alpha, for camber thrust
+  tread_rr_span:            0.20,  // fraction of C_rr variation owed to tread
+  c_rr0:                    0.0090,
+  p_exponent:               0.45,
+  t_coeff:                  0.0015,
+  deflection_factor:        1.0 / 3.0
+};
+
+const VEHICLE = { mass_kg: 1850.0, front_weight_fraction: 0.47, wheelbase_m: 2.7, cg_height_m: 0.5 };
+const TYRECFG = { r_belt_m: 0.333, tread_new_mm: 7.5, tread_legal_mm: 1.6,
+                  placard_kpa: 240.0, cold_ref_c: 25.0 };
+const G = 9.80665;
+
+/* Demo time compression. Both are DEMO PARAMETERS, not physics: the 3D view
+   runs in real time while degradation integrates faster so a 1000 km run fits
+   in a demo slot. They are surfaced in the Physics tab so no number on screen
+   is silently accelerated. */
+const TIME_SCALE  = 500;   // odometer / wear / pressure / thermal advance rate
+const WEAR_ACCEL  = 10;    // wear-rate multiplier for on-screen visibility
+const ESTIMATOR_HZ = 10;   // the estimator runs on snapshots, not every frame
+
+/* ---------------------- state and measurement layout --------------------- */
+const N_STATE = 10;
+const N_MEAS  = 12;
+const STATE_NAMES = ['tread_FL','tread_FR','tread_RL','tread_RR',
+                     'press_FL','press_FR','press_RL','press_RR',
+                     'toe_sq','camber'];
+const STATE_UNITS = ['mm','mm','mm','mm','kPa','kPa','kPa','kPa','deg²','deg'];
+const MEAS_NAMES = ['TPMS FL','TPMS FR','TPMS RL','TPMS RR',
+                    'Resonance FL','Resonance FR','Resonance RL','Resonance RR',
+                    'Front axle radius ratio','Rear axle radius ratio',
+                    'Road load force','Lateral acceleration'];
+const BLOCKED = 1e12;
+const VR_OBSERVED_THRESHOLD = 0.01;
+const JACOBIAN_NORM_EPS = 1e-10;
+
+/* Optional channels. Both default OFF, matching what the vehicle is currently
+   claimed to measure. Turning one on is a hypothesis about a sensor the system
+   does not yet have — the UI labels them as such. */
+const channels = { roadLoad: false, lateral: false };
+
+/* ---------------------------- physics ------------------------------------ */
+function effectiveRadius(tread_mm, p_kpa, fz_n) {
+  const r_free = TYRECFG.r_belt_m + tread_mm / 1000;
+  const k_z = PHYS.k_z0 * (p_kpa / TYRECFG.placard_kpa);
+  const delta = fz_n / Math.max(k_z, 1);
+  return r_free - PHYS.deflection_factor * delta;
+}
+
+function cornerWeight(idx) {                       // 0=FL 1=FR 2=RL 3=RR
+  const share = idx < 2 ? VEHICLE.front_weight_fraction : 1 - VEHICLE.front_weight_fraction;
+  return VEHICLE.mass_kg * G * share / 2;
+}
+const FZ = [cornerWeight(0), cornerWeight(1), cornerWeight(2), cornerWeight(3)];
+
+function rollingResistance(tread_mm, p_kpa, t_c) {
+  const p_term = Math.pow(TYRECFG.placard_kpa / Math.max(p_kpa, 1), PHYS.p_exponent);
+  const s = PHYS.tread_rr_span;
+  const t_term = (1 - s) + s * (tread_mm / TYRECFG.tread_new_mm);
+  const T_term = 1 + PHYS.t_coeff * (t_c - TYRECFG.cold_ref_c);
+  return PHYS.c_rr0 * p_term * t_term * T_term;
+}
+
+/* Drag is even in toe, so the sign is not recoverable — magnitude only. */
+function toeDrag(toe_sq_deg2) {
+  return 2 * PHYS.cornering_stiffness * Math.pow(Math.PI / 180, 2) * Math.max(0, toe_sq_deg2);
+}
+
+/* Camber thrust, modelled as all four wheels leaning the same way in the
+   vehicle frame, so the lateral forces add instead of cancelling. A symmetric
+   (mirrored) camber error produces no net lateral force and stays invisible
+   even with this channel enabled. UNVALIDATED. */
+function camberLateralAccel(camber_deg) {
+  return 4 * PHYS.camber_stiffness * (Math.PI / 180) * camber_deg / VEHICLE.mass_kg;
+}
+
+/* Radius ratio, right over left. Measured from wheel speeds as omega_L/omega_R
+   (the smaller radius spins faster). Prediction and measurement must use the
+   SAME orientation or the estimator drives tread differences the wrong way. */
+function radiusRatio(t_r, p_r, i_r, t_l, p_l, i_l) {
+  const rr = effectiveRadius(t_r, p_r, FZ[i_r]);
+  const rl = effectiveRadius(t_l, p_l, FZ[i_l]);
+  return rr / Math.max(rl, 1e-3);
+}
+
+function roadLoadForce(x, temps) {
+  let f = 0;
+  for (let i = 0; i < 4; i++) f += rollingResistance(x[i], x[4 + i], temps[i]) * FZ[i];
+  return f + toeDrag(x[8]);
+}
+
+/* Measurement model. Indices 4..7 (resonance) are deliberately not modelled:
+   the first-vs-second torsional mode question is open, so that channel stays
+   blocked rather than guessed. */
+function predict(x, temps) {
+  const z = new Float64Array(N_MEAS);
+  z[0] = x[4]; z[1] = x[5]; z[2] = x[6]; z[3] = x[7];
+  z[8]  = radiusRatio(x[1], x[5], 1, x[0], x[4], 0);
+  z[9]  = radiusRatio(x[3], x[7], 3, x[2], x[6], 2);
+  z[10] = roadLoadForce(x, temps);
+  z[11] = camberLateralAccel(x[9]);
+  return z;
+}
+
+/* --------------------------- prior and noise ----------------------------- */
+/* Two prior modes.
+
+   'midpoint' is what estimator.py does: start halfway between new and legal,
+   2.5 mm sigma, assuming nothing is known about the fitment. With the default
+   channel set the axle-ratio measurement only constrains the within-axle
+   DIFFERENCE, so the absolute level never leaves this prior — the estimate
+   moves about 0.01 mm and the whole tread error is the prior offset.
+
+   'fitment' encodes what a real deployment knows: the tread the tyre was
+   fitted with, minus nominal wear over the odometer reading. That is a much
+   better NUMBER, but it is prior information, not measurement — the state
+   stays WEAK either way. The toggle exists to make that distinction visible
+   rather than to flatter the estimator. */
+const priorMode = { fitment: false };
+
+function priorMean() {
+  const mid = (TYRECFG.tread_new_mm + TYRECFG.tread_legal_mm) / 2;   // 4.55 mm
+  let t = mid;
+  if (priorMode.fitment) {
+    const NOMINAL_WEAR_MM_PER_1000KM = 0.04;
+    t = Math.max(TYRECFG.tread_legal_mm,
+                 TYRECFG.tread_new_mm - NOMINAL_WEAR_MM_PER_1000KM * WEAR_ACCEL * sim.distKm / 1000);
+  }
+  return new Float64Array([t, t, t, t,
+                           TYRECFG.placard_kpa, TYRECFG.placard_kpa,
+                           TYRECFG.placard_kpa, TYRECFG.placard_kpa,
+                           0.10, 0.0]);
+}
+/* Prior COVARIANCE, not just a diagonal.
+
+   The tread block needs off-diagonal terms. A tight diagonal fitment prior
+   (0.5 mm on each corner) constrains the within-axle DIFFERENCE just as hard
+   as it constrains the level — and the difference is the one thing the axle
+   ratio actually measures, so a diagonal prior suppresses exactly the
+   asymmetric-wear signal the system exists to find.
+
+   The structure below is P = a·I + b·J over the four tread states, chosen so
+   that
+       differential variance = a                    (loose, 2.5 mm)
+       common-mode variance  = a + 4b               (tight, 0.5 mm in fitment)
+   which says: we know what tread was fitted, we do not know how the corners
+   have worn relative to each other. Eigenvalues are a+4b and a (x3), both
+   positive, so the matrix stays positive definite. */
+function priorCov() {
+  const P = [];
+  for (let i = 0; i < N_STATE; i++) P.push(new Float64Array(N_STATE));
+
+  const varDiff = 6.25;                                   // 2.5 mm differential
+  const varCm = priorMode.fitment ? 0.25 : 6.25;          // 0.5 mm vs 2.5 mm level
+  const a = varDiff;
+  const b = (varCm - varDiff) / 4;
+  for (let i = 0; i < 4; i++)
+    for (let j = 0; j < 4; j++) P[i][j] = (i === j ? a : 0) + b;
+
+  for (let i = 4; i < 8; i++) P[i][i] = 1600;             // 40 kPa 1-sigma
+  P[8][8] = 0.16;                                         // 0.40 deg^2
+  P[9][9] = 1.0;                                          // 1.0 deg
+  return P;
+}
+function priorVar() {
+  const P = priorCov();
+  const d = new Float64Array(N_STATE);
+  for (let j = 0; j < N_STATE; j++) d[j] = P[j][j];
+  return d;
+}
+
+const ROADLOAD_REF_N = (function () {
+  const x = priorMean();
+  return roadLoadForce(x, [30, 30, 30, 30]);
+})();
+
+function measurementVar(missingSensor) {
+  const R = new Float64Array(N_MEAS).fill(BLOCKED);
+  for (let i = 0; i < 4; i++) R[i] = 25.0;                 // TPMS  5 kPa 1-sigma
+  R[8] = 2.5e-5; R[9] = 2.5e-5;                            // ratio 0.005 1-sigma
+  if (channels.roadLoad) R[10] = Math.pow(0.05 * ROADLOAD_REF_N, 2);
+  if (channels.lateral)  R[11] = 4e-4;                     // 0.02 m/s^2 1-sigma
+  if (missingSensor >= 0 && missingSensor < 4) R[missingSensor] = BLOCKED;
+  return R;
+}
+
+/* ------------------------------ linear algebra --------------------------- */
+function solveN(A, b, n) {
+  const m = A.map(r => Float64Array.from(r));
+  const v = Float64Array.from(b);
+  for (let i = 0; i < n; i++) {
+    let p = i;
+    for (let k = i + 1; k < n; k++) if (Math.abs(m[k][i]) > Math.abs(m[p][i])) p = k;
+    if (Math.abs(m[p][i]) < 1e-300) return null;
+    if (p !== i) { const t = m[i]; m[i] = m[p]; m[p] = t; const tv = v[i]; v[i] = v[p]; v[p] = tv; }
+    for (let k = i + 1; k < n; k++) {
+      const f = m[k][i] / m[i][i];
+      if (f === 0) continue;
+      for (let j = i; j < n; j++) m[k][j] -= f * m[i][j];
+      v[k] -= f * v[i];
+    }
+  }
+  const x = new Float64Array(n);
+  for (let i = n - 1; i >= 0; i--) {
+    let s = v[i];
+    for (let j = i + 1; j < n; j++) s -= m[i][j] * x[j];
+    x[i] = s / m[i][i];
+  }
+  return x;
+}
+
+function invertN(A, n) {
+  const M = [];
+  for (let i = 0; i < n; i++) {
+    const row = new Float64Array(2 * n);
+    row.set(A[i]); row[n + i] = 1;
+    M.push(row);
+  }
+  for (let i = 0; i < n; i++) {
+    let p = i;
+    for (let k = i + 1; k < n; k++) if (Math.abs(M[k][i]) > Math.abs(M[p][i])) p = k;
+    if (Math.abs(M[p][i]) < 1e-300) return null;
+    if (p !== i) { const t = M[i]; M[i] = M[p]; M[p] = t; }
+    const d = M[i][i];
+    for (let j = 0; j < 2 * n; j++) M[i][j] /= d;
+    for (let k = 0; k < n; k++) {
+      if (k === i) continue;
+      const f = M[k][i];
+      if (f === 0) continue;
+      for (let j = 0; j < 2 * n; j++) M[k][j] -= f * M[i][j];
+    }
+  }
+  return M.map(r => r.slice(n));
+}
+
+function jacobian(x, temps) {
+  const H = [];
+  for (let i = 0; i < N_MEAS; i++) H.push(new Float64Array(N_STATE));
+  const eps = 1e-5;
+  const xp = Float64Array.from(x), xm = Float64Array.from(x);
+  for (let j = 0; j < N_STATE; j++) {
+    const x0 = x[j];
+    xp[j] = x0 + eps; xm[j] = x0 - eps;
+    const zp = predict(xp, temps), zm = predict(xm, temps);
+    for (let i = 0; i < N_MEAS; i++) H[i][j] = (zp[i] - zm[i]) / (2 * eps);
+    xp[j] = x0; xm[j] = x0;
+  }
+  return H;
+}
+
+/* ------------------------- Gauss-Newton MAP solver ------------------------ */
+function gaussNewton(z_meas, temps, missingSensor) {
+  const x0 = priorMean();
+  const P0 = priorCov();
+  const P0d = priorVar();
+  const R = measurementVar(missingSensor);
+  const P0inv = invertN(P0, N_STATE);
+  const x = Float64Array.from(x0);
+
+  let converged = false, nIters = 0;
+
+  for (let iter = 0; iter < 6; iter++) {
+    nIters = iter + 1;
+    const H = jacobian(x, temps);
+    const zp = predict(x, temps);
+
+    const A = [];
+    for (let i = 0; i < N_STATE; i++) A.push(new Float64Array(N_STATE));
+    const b = new Float64Array(N_STATE);
+
+    for (let i = 0; i < N_MEAS; i++) {
+      const ri = 1 / R[i];
+      const res = z_meas[i] - zp[i];
+      for (let j = 0; j < N_STATE; j++) {
+        const hij = H[i][j];
+        if (hij === 0) continue;
+        b[j] += hij * ri * res;
+        for (let k = j; k < N_STATE; k++) {
+          const v = hij * ri * H[i][k];
+          A[j][k] += v;
+          if (k !== j) A[k][j] += v;
+        }
+      }
+    }
+    for (let j = 0; j < N_STATE; j++) {
+      for (let k = 0; k < N_STATE; k++) {
+        b[j] += P0inv[j][k] * (x0[k] - x[k]);
+        A[j][k] += P0inv[j][k];
+      }
+    }
+
+    const dx = solveN(A, b, N_STATE);
+    if (!dx) break;
+
+    let maxStep = 0;
+    for (let j = 0; j < N_STATE; j++) { x[j] += dx[j]; maxStep = Math.max(maxStep, Math.abs(dx[j])); }
+
+    for (let j = 0; j < 4; j++)     x[j] = Math.min(9, Math.max(0.5, x[j]));
+    for (let j = 4; j < 8; j++)     x[j] = Math.min(500, Math.max(50, x[j]));
+    x[8] = Math.max(0, x[8]);
+
+    if (maxStep < 1e-7) { converged = true; break; }
+  }
+
+  /* Posterior from the information matrix at the solution:
+       P = (P0^-1 + H^T R^-1 H)^-1
+     The full matrix is required, not just the diagonal: the common-mode test
+     below reads an off-diagonal direction. */
+  const Hf = jacobian(x, temps);
+  const A = [];
+  for (let i = 0; i < N_STATE; i++) A.push(new Float64Array(N_STATE));
+  for (let i = 0; i < N_MEAS; i++) {
+    const ri = 1 / R[i];
+    for (let j = 0; j < N_STATE; j++) {
+      const hij = Hf[i][j];
+      if (hij === 0) continue;
+      for (let k = j; k < N_STATE; k++) {
+        const v = hij * ri * Hf[i][k];
+        A[j][k] += v;
+        if (k !== j) A[k][j] += v;
+      }
+    }
+  }
+  for (let j = 0; j < N_STATE; j++)
+    for (let k = 0; k < N_STATE; k++) A[j][k] += P0inv[j][k];
+  const P = invertN(A, N_STATE) || P0;
+
+  const states = classifyObservability(Hf, P0, P0d, P, x0, x, R);
+  const nObs = states.filter(s => s.obs === 'OBSERVED').length;
+  const meanVr = nObs ? states.filter(s => s.obs === 'OBSERVED')
+                              .reduce((a, s) => a + s.vr, 0) / nObs : 0;
+  const nMeasUsed = Array.from(R).filter(r => r < 1e11).length;
+
+  return { x, P, states, converged, nIters, nObs, meanVr, nMeasUsed, R };
+}
+
+/* Observability classification, mirroring estimator.py:415-490.
+
+   The axle-ratio channel predicts r_right/r_left. It constrains the DIFFERENCE
+   in tread across an axle and says nothing about both corners moving together,
+   so a marginal variance can shrink a lot while the absolute level stays
+   unknown. Each axle pair is therefore tested along its common-mode direction
+   u = (e_i + e_j)/sqrt(2); if that direction is essentially unreduced, both
+   members are demoted to WEAK. Reporting them as OBSERVED would claim an
+   absolute tread number the data does not contain. */
+function classifyObservability(H, P0, P0d, P, x0, x, R) {
+  const differentialOnly = {};
+  for (const [ia, ib] of [[0, 1], [2, 3]]) {
+    const s = 1 / Math.SQRT2;
+    const priorCm = s * s * (P0[ia][ia] + 2 * P0[ia][ib] + P0[ib][ib]);
+    const postCm  = s * s * (P[ia][ia] + 2 * P[ia][ib] + P[ib][ib]);
+    if (priorCm > 0) {
+      const red = Math.max(0, Math.min(1 - postCm / priorCm, 1));
+      if (red < VR_OBSERVED_THRESHOLD) { differentialOnly[ia] = red; differentialOnly[ib] = red; }
+    }
+  }
+
+  const out = [];
+  for (let j = 0; j < N_STATE; j++) {
+    /* Sensitivity is counted over AVAILABLE channels only. A blocked channel
+       still has a non-zero Jacobian entry — the model can predict it — but it
+       carries no information, so including it would report a state as merely
+       WEAK when nothing on the vehicle can see it at all. */
+    let sq = 0;
+    for (let i = 0; i < N_MEAS; i++) {
+      if (R[i] >= 1e11) continue;
+      sq += H[i][j] * H[i][j];
+    }
+    const colNorm = Math.sqrt(sq);
+    const priorVarJ = P0d[j];
+    const postVarJ = Math.max(0, P[j][j]);
+    const vr = priorVarJ > 0 ? Math.max(0, Math.min(1 - postVarJ / priorVarJ, 1)) : 0;
+
+    let obs, reason;
+    if (colNorm < JACOBIAN_NORM_EPS) {
+      obs = 'UNOBSERVABLE';
+      reason = 'Zero Jacobian sensitivity (' + colNorm.toExponential(2) +
+               ') — posterior equals prior; the reported value IS the prior';
+    } else if (vr < VR_OBSERVED_THRESHOLD) {
+      obs = 'WEAK';
+      reason = 'Low information gain (variance reduction ' + vr.toFixed(4) + ')';
+    } else if (j in differentialOnly) {
+      obs = 'WEAK';
+      reason = 'Only the within-axle difference is constrained (marginal reduction ' +
+               vr.toFixed(4) + ', common-mode reduction ' + differentialOnly[j].toFixed(4) +
+               '); the absolute level is not recoverable from this channel set';
+    } else {
+      obs = 'OBSERVED';
+      reason = null;
+    }
+
+    out.push({
+      name: STATE_NAMES[j], unit: STATE_UNITS[j],
+      value: x[j], sigma: Math.sqrt(postVarJ),
+      prior: x0[j], priorSigma: Math.sqrt(priorVarJ),
+      obs, reason, vr, colNorm,
+      magnitudeOnly: STATE_NAMES[j].indexOf('toe') === 0
+    });
+  }
+  return out;
+}
+
+/* ------------------------------- scenarios ------------------------------- */
+/* wearRates are mm per 1000 km. camber is a ground-truth alignment fault in
+   degrees; it is invisible to the estimator unless the lateral channel is on. */
+const SCENARIOS = [
+  { name:'Normal',             treads:[7.5,7.5,7.5,7.5], pressures:[240,240,240,240], wearRates:[0.03,0.03,0.04,0.05], pDrift:[0,0,0,0],    toeSq:0.1, camber:0,    missingSensor:-1, ambientTemp:25, defaultSpeed:20 },
+  { name:'Low Pressure',       treads:[7.5,7.5,7.5,7.5], pressures:[240,240,180,240], wearRates:[0.03,0.03,0.08,0.03], pDrift:[0,0,0,0],    toeSq:0.1, camber:0,    missingSensor:-1, ambientTemp:25, defaultSpeed:20 },
+  { name:'Asymmetric Wear',    treads:[7.5,7.5,5.0,4.0], pressures:[240,240,240,240], wearRates:[0.02,0.02,0.06,0.08], pDrift:[0,0,0,0],    toeSq:0.1, camber:0,    missingSensor:-1, ambientTemp:25, defaultSpeed:20 },
+  { name:'Accelerated Deg.',   treads:[6.0,6.0,6.0,6.0], pressures:[240,240,240,240], wearRates:[0.15,0.15,0.15,0.15], pDrift:[0,0,0,0],    toeSq:0.1, camber:0,    missingSensor:-1, ambientTemp:25, defaultSpeed:20 },
+  { name:'Pressure Drift',     treads:[7.5,7.5,7.5,7.5], pressures:[240,240,240,240], wearRates:[0.03,0.03,0.04,0.05], pDrift:[0,0,-5,0],   toeSq:0.1, camber:0,    missingSensor:-1, ambientTemp:25, defaultSpeed:20 },
+  { name:'Toe Misalignment',   treads:[7.5,7.5,7.5,7.5], pressures:[240,240,240,240], wearRates:[0.03,0.03,0.04,0.05], pDrift:[0,0,0,0],    toeSq:2.5, camber:0,    missingSensor:-1, ambientTemp:25, defaultSpeed:20 },
+  { name:'Sensor Failure',     treads:[7.5,7.5,7.5,7.5], pressures:[240,240,240,240], wearRates:[0.03,0.03,0.04,0.05], pDrift:[0,0,0,0],    toeSq:0.1, camber:0,    missingSensor:3,  ambientTemp:25, defaultSpeed:20 },
+  { name:'Mixed Fault',        treads:[7.5,7.5,5.0,4.0], pressures:[240,240,180,240], wearRates:[0.03,0.03,0.08,0.05], pDrift:[0,0,-3,0],   toeSq:0.1, camber:-1.5, missingSensor:-1, ambientTemp:25, defaultSpeed:20 },
+  { name:'Thermal Stress',     treads:[7.5,7.5,7.5,7.5], pressures:[240,240,240,240], wearRates:[0.03,0.03,0.04,0.05], pDrift:[0,0,0,0],    toeSq:0.1, camber:0,    missingSensor:-1, ambientTemp:45, defaultSpeed:20 },
+  { name:'Highway',            treads:[7.5,7.5,7.5,7.5], pressures:[240,240,240,240], wearRates:[0.01,0.01,0.01,0.01], pDrift:[0,0,0,0],    toeSq:0.1, camber:0,    missingSensor:-1, ambientTemp:25, defaultSpeed:27.78 }
+];
+
+/* --------------------------- simulation state ---------------------------- */
+const sim = {
+  treads: [7.5, 7.5, 7.5, 7.5],
+  pressures: [240, 240, 240, 240],
+  temps: [30, 30, 35, 31],
+  toeSq: 0.1,
+  camber: 0,
+  speed: 20,
+  ambient: 25,
+  distKm: 0,
+  timestamp: 0,
+  paused: false,
+  scenarioIdx: 0,
+  suspDisp: 0,
+  suspVel: 0,
+  pitch: 0,
+  prevSpeed: 20,
+  estResult: null,
+  converged: false,
+  nObserved: 0,
+  nMeasUsed: 0,
+  iterations: 0,
+  meanVr: 0,
+  estAccum: 0,
+  history: []
+};
+
+/* Seeded noise so a scenario run is reproducible, per CLAUDE.md. */
+let noiseRand = mulberry32(1);
+function uniformNoise(halfWidth) { return (noiseRand() - 0.5) * 2 * halfWidth; }
+
+/* ------------------------------ suspension ------------------------------- */
+/* Heave as a damped second-order body mode. The prompt's formulation added
+   force directly to velocity with no mass term, which makes omega^2 = 35000
+   (omega = 187 rad/s) and explodes under explicit Euler at any real frame
+   time — the clamp was hiding a divergence rather than bounding a physical
+   motion. Dividing by the body mass gives omega = 8.7 rad/s, zeta = 0.56. */
+const SUSP_K = 140000, SUSP_C = 18000, SUSP_M = VEHICLE.mass_kg;
+
+function integrateSuspension(dt, longAccel) {
+  const a = (-SUSP_K * sim.suspDisp - SUSP_C * sim.suspVel) / SUSP_M;
+  sim.suspVel += a * dt;
+  sim.suspDisp += sim.suspVel * dt;
+  if (sim.suspDisp >  SUSP_CLAMP) { sim.suspDisp =  SUSP_CLAMP; sim.suspVel = Math.min(0, sim.suspVel); }
+  if (sim.suspDisp < -SUSP_CLAMP) { sim.suspDisp = -SUSP_CLAMP; sim.suspVel = Math.max(0, sim.suspVel); }
+
+  // pitch: longitudinal load transfer, first-order lag toward the static angle
+  const target = -(VEHICLE.cg_height_m / VEHICLE.wheelbase_m) * longAccel * 0.012;
+  sim.pitch += (target - sim.pitch) * Math.min(1, dt * 4);
+}
+
+/* --------------------------- thermal model ------------------------------- */
+/* Lumped tyre mass heated by rolling loss, cooled toward ambient.
+   dT/dt = C_rr*Fz*v / C_th - (T - T_amb)/tau.
+   Steady rise at 20 m/s is about 18 C above ambient, which is the right order
+   for a passenger tyre. Both constants are UNVALIDATED. */
+const TH_CAPACITY = 25000;   // J/K per tyre
+const TH_TAU = 600;          // s
+
+function integrateThermal(dtSim) {
+  for (let i = 0; i < 4; i++) {
+    const crr = rollingResistance(sim.treads[i], sim.pressures[i], sim.temps[i]);
+    const power = crr * FZ[i] * sim.speed;
+    const dT = (power / TH_CAPACITY - (sim.temps[i] - sim.ambient) / TH_TAU) * dtSim;
+    sim.temps[i] = Math.max(-40, Math.min(150, sim.temps[i] + dT));
+  }
+}
+
+/* ---------------------- measurement vector construction ------------------ */
+/* Built from the TRUE state with the SAME functions the estimator predicts
+   with, so any mismatch is noise or unobservability, never a convention slip. */
+function buildMeasurement() {
+  const xTrue = trueState();
+  const z = predict(xTrue, sim.temps);
+  for (let i = 0; i < 4; i++) z[i] += uniformNoise(0.5);      // TPMS   +/- 0.5 kPa
+  z[8]  += uniformNoise(1e-4);                                 // ratio  +/- 1e-4
+  z[9]  += uniformNoise(1e-4);
+  z[10] += uniformNoise(0.02 * ROADLOAD_REF_N);                // road load +/- 2 %
+  z[11] += uniformNoise(0.01);                                 // lateral +/- 0.01 m/s^2
+  return z;
+}
+
+function trueState() {
+  return new Float64Array([
+    sim.treads[0], sim.treads[1], sim.treads[2], sim.treads[3],
+    sim.pressures[0], sim.pressures[1], sim.pressures[2], sim.pressures[3],
+    sim.toeSq, sim.camber
+  ]);
+}
+
+/* ------------------------------ simulation ------------------------------- */
+function simStep(dt) {
+  if (sim.paused) return;
+  const sc = SCENARIOS[sim.scenarioIdx];
+
+  const dtSim = dt * TIME_SCALE;
+  const distStepKm = sim.speed * dtSim / 1000;
+  sim.distKm += distStepKm;
+  sim.timestamp += dt;
+
+  for (let i = 0; i < 4; i++) {
+    sim.treads[i] = Math.max(0.5,
+      sim.treads[i] - sc.wearRates[i] * WEAR_ACCEL * distStepKm / 1000);
+    sim.pressures[i] = Math.max(50,
+      sim.pressures[i] + sc.pDrift[i] * distStepKm / 1000);
+  }
+  integrateThermal(dtSim);
+
+  const longAccel = (sim.speed - sim.prevSpeed) / Math.max(dt, 1e-3);
+  integrateSuspension(dt, longAccel);
+  sim.prevSpeed = sim.speed;
+}
+
+/* Speed bumps arrive on a fixed 200 m interval of REAL travel, tracked by the
+   3D scroller rather than the compressed odometer. */
+function bumpImpulse() { sim.suspVel += 0.09; }
+
+function runEstimator() {
+  const sc = SCENARIOS[sim.scenarioIdx];
+  const z = buildMeasurement();
+  const r = gaussNewton(z, sim.temps, sc.missingSensor);
+  sim.estResult = r;
+  sim.converged = r.converged;
+  sim.nObserved = r.nObs;
+  sim.nMeasUsed = r.nMeasUsed;
+  sim.iterations = r.nIters;
+  sim.meanVr = r.meanVr;
+
+  const last = sim.history[sim.history.length - 1];
+  if (!last || sim.distKm - last.km > 2) {
+    sim.history.push({ km: sim.distKm, t: sim.treads.slice(),
+                       e: [r.x[0], r.x[1], r.x[2], r.x[3]] });
+    if (sim.history.length > 600) sim.history.shift();
+  }
+}
+
+/* Analytic seek: wear and drift are linear in distance and the thermal state
+   is at equilibrium, so scrubbing the distance slider is exact rather than
+   requiring the sim to be replayed. */
+function seekToDistance(km) {
+  const sc = SCENARIOS[sim.scenarioIdx];
+  sim.distKm = km;
+  for (let i = 0; i < 4; i++) {
+    sim.treads[i] = Math.max(0.5, sc.treads[i] - sc.wearRates[i] * WEAR_ACCEL * km / 1000);
+    sim.pressures[i] = Math.max(50, sc.pressures[i] + sc.pDrift[i] * km / 1000);
+    const crr = rollingResistance(sim.treads[i], sim.pressures[i], sim.ambient);
+    sim.temps[i] = sim.ambient + crr * FZ[i] * sim.speed * TH_TAU / TH_CAPACITY;
+  }
+  sim.history.length = 0;
+  runEstimator();
+}
+
+function initSim() {
+  const sc = SCENARIOS[sim.scenarioIdx];
+  sim.treads = sc.treads.slice();
+  sim.pressures = sc.pressures.slice();
+  sim.temps = [sc.ambientTemp + 5, sc.ambientTemp + 5, sc.ambientTemp + 10, sc.ambientTemp + 6];
+  sim.toeSq = sc.toeSq;
+  sim.camber = sc.camber;
+  sim.ambient = sc.ambientTemp;
+  sim.speed = sc.defaultSpeed;
+  sim.prevSpeed = sc.defaultSpeed;
+  sim.distKm = 0;
+  sim.timestamp = 0;
+  sim.paused = false;
+  sim.suspDisp = 0;
+  sim.suspVel = 0;
+  sim.pitch = 0;
+  sim.estResult = null;
+  sim.estAccum = 0;
+  sim.history.length = 0;
+  noiseRand = mulberry32(1000 + sim.scenarioIdx);
+
+  for (let i = 0; i < 4; i++) {
+    tyres[i].scale.set(1, 1, 1);
+    tyreGlows[i].intensity = 0;
+    tyreMats[i][0].color.setHex(C.rubber);
+    tyreMats[i][1].color.setHex(C.tread);
+    tyreMats[i][0].emissiveIntensity = 0;
+    tyreMats[i][1].emissiveIntensity = 0;
+  }
+  bodyGroup.position.y = 0;
+  bodyGroup.rotation.x = 0;
+  if (typeof resetParticles === 'function') resetParticles();
+
+  setVal('speed-slider', sc.defaultSpeed);
+  setVal('temp-slider', sc.ambientTemp);
+  setVal('dist-slider', 0);
+  setVal('camber-slider', sc.camber);
+  setVal('toe-slider', Math.sqrt(sc.toeSq).toFixed(2));
+  setText('speed-val', sc.defaultSpeed.toFixed(1) + ' m/s');
+  setText('temp-val', sc.ambientTemp + ' °C');
+  setText('dist-val', '0.0 km');
+  setText('camber-val', sc.camber.toFixed(2) + '°');
+  setText('toe-val', Math.sqrt(sc.toeSq).toFixed(2) + '°');
+  setText('scenario-name', sc.name);
+  const sel = document.getElementById('scenario-select');
+  if (sel) sel.value = String(sim.scenarioIdx);
+  setPlayIcon();
+  renderScenarioDetail(sc);
+  runEstimator();
+  updateUI(true);
+}
+
+function setVal(id, v) { const el = document.getElementById(id); if (el) el.value = v; }
+function setPlayIcon() {
+  const b = document.getElementById('play-btn');
+  if (b) b.textContent = sim.paused ? '▶' : '❚❚';
+}
+
+/* ==========================================================================
+   UI
+   ========================================================================== */
+const OBS_CLASS = { OBSERVED: 'badge-ok', WEAK: 'badge-warn', UNOBSERVABLE: 'badge-bad' };
+
+function renderScenarioDetail(sc) {
+  const el = document.getElementById('scenario-detail');
+  if (!el) return;
+  const bits = [];
+  if (sc.missingSensor >= 0) bits.push(['TPMS ' + CORNERS[sc.missingSensor], 'offline']);
+  if (sc.toeSq > 0.5) bits.push(['toe (true)', Math.sqrt(sc.toeSq).toFixed(2) + '°']);
+  if (sc.camber !== 0) bits.push(['camber (true)', sc.camber.toFixed(2) + '°']);
+  if (sc.ambientTemp !== 25) bits.push(['ambient', sc.ambientTemp + ' °C']);
+  if (sc.pDrift.some(v => v !== 0)) bits.push(['pressure drift', 'active']);
+  bits.push(['wear (mm/1000 km)', sc.wearRates.map(v => v.toFixed(2)).join(' ')]);
+  el.innerHTML = bits.map(([k, v]) =>
+    '<div class="kv"><span class="k">' + k + '</span><span class="v">' + v + '</span></div>').join('');
+}
+
+function treadColour(mm) { return mm > 5 ? C.ok : mm > 2 ? C.warn : C.bad; }
+function treadCssVar(mm) { return mm > 5 ? 'var(--ok)' : mm > 2 ? 'var(--warn)' : 'var(--bad)'; }
+
+let lifeCache = null;
+
+function updateUI(force) {
+  const r = sim.estResult;
+  if (!r) return;
+  if (capabilitySweeping) return;   // the sweep drives initSim() repeatedly
+  lifeCache = computeLife();
+
+  for (let i = 0; i < 4; i++) {
+    const c = CORNERS[i];
+
+    /* The card reports what the ESTIMATOR produced, not sim.treads[i].
+       The simulated ground truth drives the 3D vehicle — that is the physical
+       twin — but a panel presenting the system's output must not quietly show
+       the answer sheet. Truth appears only in the estimator table, labelled. */
+    const t = r.states[i].value;
+    const p = r.states[4 + i].value;
+    const big = document.getElementById('tread-' + c);
+    if (big) {
+      big.style.color = treadCssVar(t);
+      big.innerHTML = t.toFixed(2) + '<span class="unit">mm est</span>';
+    }
+    const bar = document.getElementById('wear-' + c);
+    if (bar) {
+      const frac = Math.max(0, Math.min(1, (t - TYRECFG.tread_legal_mm) /
+        (TYRECFG.tread_new_mm - TYRECFG.tread_legal_mm)));
+      bar.style.width = (frac * 100).toFixed(1) + '%';
+      bar.style.background = treadCssVar(t);
+    }
+    setText('sub-' + c, p.toFixed(0) + ' kPa est · ' + sim.temps[i].toFixed(1) + ' °C meas');
+
+    /* The observability LABEL is a coarse summary and rarely changes between
+       scenarios, because observability is a property of the channel set rather
+       than of the state values. The information that does move — posterior
+       sigma and variance reduction — is shown next to it. */
+    const ps = r.states[4 + i];
+    setText('psig-' + c, '±' + ps.sigma.toFixed(1) + ' kPa · vr ' + ps.vr.toFixed(3));
+    const psEl = document.getElementById('psig-' + c);
+    if (psEl) psEl.style.color = ps.vr < 0.5 ? 'var(--warn)' : 'var(--txt-mut)';
+
+    const badge = document.getElementById('obs-' + c);
+    if (badge) {
+      const st = r.states[i];
+      badge.textContent = st.obs;
+      badge.className = 'badge ' + OBS_CLASS[st.obs];
+      badge.title = st.reason || 'Posterior variance reduced by ' + st.vr.toFixed(4);
+    }
+    setText('tsig-' + c, '±' + r.states[i].sigma.toFixed(2) + ' mm');
+
+    /* Remaining life on the card. The observability badge is kept in the DOM
+       but hidden here — the ± sigma beside the tread figure already carries
+       the uncertainty, and the full classification with its reason string is
+       one click away in the Observability tab. */
+    if (lifeCache) {
+      const lc = lifeCache.corners[i];
+      const bar = document.getElementById('life-' + c);
+      if (bar) {
+        bar.style.width = (lc.lifeFrac * 100).toFixed(1) + '%';
+        bar.style.background = treadCssVar(lc.tread);
+      }
+      setText('lifepct-' + c, (lc.lifeFrac * 100).toFixed(0) + '%');
+      setText('rul-' + c, '±' + lc.sigma.toFixed(2) + ' mm · ' + fmtKm(lc.remainingKm) + ' to limit');
+    }
+  }
+
+  setText('stat-observed', r.nObs + '/10');
+  setText('stat-meas', r.nMeasUsed + '/' + N_MEAS);
+  setText('stat-converged', r.converged ? 'YES' : 'NO');
+  setText('stat-iters', String(r.nIters));
+  setText('stat-vr', r.meanVr.toFixed(4));
+  const cb = document.getElementById('stat-conv-block');
+  if (cb) cb.className = 'stat-block ' + (r.converged ? 'ok' : 'bad');
+
+  const toeSt = r.states[8], camSt = r.states[9];
+  setText('hud-speed', sim.speed.toFixed(1) + ' m/s');
+  setText('hud-dist', sim.distKm.toFixed(1) + ' km');
+  setText('hud-toe', Math.sqrt(Math.max(0, toeSt.value)).toFixed(2) + '° ±' + toeSt.obs.charAt(0));
+  setText('hud-camber', camSt.value.toFixed(2) + '° ' + camSt.obs.charAt(0));
+
+  setText('dist-val', sim.distKm.toFixed(1) + ' km');
+  setVal('dist-slider', Math.min(1000, sim.distKm));
+
+  renderEstimatorTable(r);
+  renderObservability(r);
+  renderAccuracy();
+  renderPhysics();
+  renderWearTab();
+  renderLifePanel();
+}
+
+function renderEstimatorTable(r) {
+  const pane = document.getElementById('pane-estimator');
+  if (!pane || !pane.classList.contains('active')) return;
+  const xt = trueState();
+  let h = '<table class="dt"><thead><tr>' +
+    '<th>State</th><th style="text-align:right">Estimate</th><th style="text-align:right">σ</th>' +
+    '<th style="text-align:right">Truth</th><th style="text-align:right">Error</th>' +
+    '<th style="text-align:right">Var.red.</th><th>Observability</th></tr></thead><tbody>';
+  for (let j = 0; j < N_STATE; j++) {
+    const s = r.states[j];
+    const err = s.value - xt[j];
+    const dp = j < 4 ? 2 : j < 8 ? 1 : 3;
+    h += '<tr title="' + (s.reason ? s.reason.replace(/"/g, '') : 'Observed') + '">' +
+      '<td>' + s.name + ' <span class="mut">' + s.unit + '</span>' +
+        (s.magnitudeOnly ? ' <span class="mut">(sign not recoverable)</span>' : '') + '</td>' +
+      '<td class="num">' + s.value.toFixed(dp) + '</td>' +
+      '<td class="sig">' + s.sigma.toFixed(dp) + '</td>' +
+      '<td class="sig">' + xt[j].toFixed(dp) + '</td>' +
+      '<td class="num" style="color:' + (Math.abs(err) < Math.max(s.sigma, 1e-9) ? 'var(--ok)' : 'var(--warn)') + '">' +
+        (err >= 0 ? '+' : '') + err.toFixed(dp) + '</td>' +
+      '<td class="sig">' + s.vr.toFixed(4) + '</td>' +
+      '<td><span class="badge ' + OBS_CLASS[s.obs] + '">' + s.obs + '</span></td></tr>';
+  }
+  h += '</tbody></table>';
+  h += '<div class="note note-warn">Truth and Error columns exist because this is a SIMULATION. ' +
+       'They are a model-vs-model comparison against the generating model, not real-world validation.</div>';
+  pane.innerHTML = h;
+}
+
+function renderObservability(r) {
+  const pane = document.getElementById('pane-observability');
+  if (!pane || !pane.classList.contains('active')) return;
+  const col = { OBSERVED: 'var(--ok)', WEAK: 'var(--warn)', UNOBSERVABLE: 'var(--bad)' };
+  let h = '<div style="display:flex;flex-direction:column;gap:4px;">';
+  for (let j = 0; j < N_STATE; j++) {
+    const s = r.states[j];
+    h += '<div style="display:flex;align-items:center;gap:9px;font-family:var(--font-m);font-size:10.5px;" ' +
+         'title="' + (s.reason ? s.reason.replace(/"/g, '') : 'Observed') + '">' +
+      '<span style="width:74px;color:var(--txt-dim);">' + s.name + '</span>' +
+      '<div class="vr-track"><div class="vr-fill" style="width:' + (s.vr * 100).toFixed(1) +
+        '%;background:' + col[s.obs] + ';"></div></div>' +
+      '<span style="width:52px;text-align:right;">' + s.vr.toFixed(4) + '</span>' +
+      '<span style="width:96px;"><span class="badge ' + OBS_CLASS[s.obs] + '">' + s.obs + '</span></span>' +
+      '<span style="width:60px;text-align:right;color:var(--txt-mut);">‖H·j‖ ' +
+        (s.colNorm < 1e-10 ? '0' : s.colNorm.toExponential(1)) + '</span>' +
+      '</div>';
+  }
+  h += '</div>';
+  h += '<div class="note note-info">Bar length is the posterior variance reduction ' +
+       '1 − P<sub>post</sub>/P<sub>prior</sub>. A state with a zero Jacobian column carries no information: ' +
+       'its reported value is the prior, unchanged. Tread pairs are additionally tested along their ' +
+       'common-mode direction — the axle-ratio channel constrains the within-axle difference only.</div>';
+  pane.innerHTML = h;
+}
+
+/* ------------------------------- controls -------------------------------- */
+function initUI() {
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('pane-' + btn.dataset.tab).classList.add('active');
+      updateUI(true);
+    });
+  });
+
+  const sel = document.getElementById('scenario-select');
+  sel.innerHTML = SCENARIOS.map((s, i) => '<option value="' + i + '">' + (i + 1) + '. ' + s.name + '</option>').join('');
+  sel.addEventListener('change', () => { sim.scenarioIdx = +sel.value; initSim(); });
+
+  document.getElementById('speed-slider').addEventListener('input', e => {
+    sim.speed = +e.target.value;
+    setText('speed-val', sim.speed.toFixed(1) + ' m/s');
+  });
+  document.getElementById('temp-slider').addEventListener('input', e => {
+    sim.ambient = +e.target.value;
+    setText('temp-val', e.target.value + ' °C');
+  });
+  document.getElementById('dist-slider').addEventListener('input', e => {
+    seekToDistance(+e.target.value);
+    setText('dist-val', (+e.target.value).toFixed(1) + ' km');
+    updateUI(true);
+  });
+  document.getElementById('camber-slider').addEventListener('input', e => {
+    sim.camber = +e.target.value;
+    setText('camber-val', sim.camber.toFixed(2) + '°');
+    runEstimator(); updateUI(true);
+  });
+  document.getElementById('toe-slider').addEventListener('input', e => {
+    sim.toeSq = Math.pow(+e.target.value, 2);
+    setText('toe-val', (+e.target.value).toFixed(2) + '°');
+    runEstimator(); updateUI(true);
+  });
+
+  document.getElementById('ch-roadload').addEventListener('change', e => {
+    channels.roadLoad = e.target.checked; runEstimator(); updateUI(true); renderSensors();
+  });
+  document.getElementById('ch-lateral').addEventListener('change', e => {
+    channels.lateral = e.target.checked; runEstimator(); updateUI(true); renderSensors();
+  });
+  document.getElementById('pr-fitment').addEventListener('change', e => {
+    priorMode.fitment = e.target.checked; runEstimator(); updateUI(true);
+  });
+  document.querySelectorAll('[data-pkg]').forEach(b =>
+    b.addEventListener('click', () => setPackage(b.dataset.pkg)));
+
+  /* A real deployment knows what tread the tyre was fitted with, so the
+     informative prior is the honest default. It changes the NUMBER only:
+     the observability labels are identical either way. */
+  priorMode.fitment = true;
+  document.getElementById('pr-fitment').checked = true;
+  setText('pkg-note', PACKAGES.base.note);
+
+  document.getElementById('play-btn').addEventListener('click', () => { sim.paused = !sim.paused; setPlayIcon(); });
+  document.getElementById('reset-btn').addEventListener('click', () => initSim());
+
+  const camOrbit = document.getElementById('cam-orbit');
+  const camFront = document.getElementById('cam-front');
+  camOrbit.addEventListener('click', () => {
+    controls.enabled = true;
+    camOrbit.classList.add('active'); camFront.classList.remove('active');
+  });
+  camFront.addEventListener('click', () => {
+    camera.position.set(0, 2.0, 11); controls.update();
+    camFront.classList.add('active'); camOrbit.classList.remove('active');
+  });
+
+  renderSensors();
+}
+
+function renderSensors() {
+  const sc = SCENARIOS[sim.scenarioIdx];
+  const rows = [];
+  for (let i = 0; i < 4; i++) rows.push(['Wheel speed ' + CORNERS[i], true, '']);
+  for (let i = 0; i < 4; i++) rows.push(['TPMS ' + CORNERS[i], sc.missingSensor !== i, '']);
+  rows.push(['Tyre temperature', true, '']);
+  rows.push(['Motor torque road load', channels.roadLoad, 'optional']);
+  rows.push(['Lateral accelerometer', channels.lateral, 'optional']);
+  const list = document.getElementById('sensor-list');
+  if (!list) return;
+  list.innerHTML = rows.map(([n, on, tag]) =>
+    '<div class="sensor-row"><span class="dot ' + (on ? 'on' : 'off') + '"></span>' + n +
+    (tag ? ' <span class="mut" style="font-size:9px;">' + tag + '</span>' : '') + '</div>').join('');
+  document.getElementById('sensor-count').textContent =
+    rows.filter(r => r[1]).length + '/' + rows.length;
+}
+
+
+/* ==========================================================================
+   PHASE 4 — tyre visuals, particles, body motion
+   ========================================================================== */
+
+const HEAT_EMISSIVE = 0xc4553a;   // ember, not neon
+const DEFORM_GAIN   = 1.5;        // visual magnification of the real deflection
+const TREAD_LERP    = 0.10;
+
+/* Tread health, load deflection and temperature, driven straight from the
+   simulated state. Deflection uses the same delta = Fz/k_z the rolling-radius
+   model uses, expressed as a fraction of the radius, so the squash on screen
+   is the squash the estimator is reasoning about — magnified by DEFORM_GAIN
+   because 6 % is not legible at this scale. */
+function updateTyreVisuals() {
+  for (let i = 0; i < 4; i++) {
+    const tread = sim.treads[i];
+    const press = sim.pressures[i];
+    const temp  = sim.temps[i];
+
+    const target = new THREE.Color(treadColour(tread));
+    tyreMats[i][0].color.lerp(target, TREAD_LERP);
+    tyreMats[i][1].color.lerp(target.clone().multiplyScalar(0.45), TREAD_LERP);
+
+    const k_z = PHYS.k_z0 * (press / TYRECFG.placard_kpa);
+    const delta = FZ[i] / Math.max(k_z, 1);
+    const squash = Math.min(0.15, (delta / TYRE_R) * DEFORM_GAIN);
+    tyres[i].scale.y = Math.max(0.85, 1 - squash);
+    tyres[i].scale.x = 1 + squash * 0.33;
+    tyres[i].scale.z = 1 + squash * 0.10;
+
+    const heat = Math.max(0, Math.min(1, (temp - 25) / 80));
+    tyreMats[i][0].emissive.setHex(HEAT_EMISSIVE);
+    tyreMats[i][1].emissive.setHex(HEAT_EMISSIVE);
+    tyreMats[i][0].emissiveIntensity = heat * 0.5;
+    tyreMats[i][1].emissiveIntensity = heat * 0.5;
+    tyreGlows[i].intensity = heat * 0.8;
+    tyreGlows[i].color.setHex(HEAT_EMISSIVE);
+  }
+}
+
+/* ------------------------------- particles ------------------------------- */
+const P_MAX = 500;
+let pPos, pCol, pSize, pVel, pLife, pMaxLife, pGeo, pPoints, pHead = 0, pAlive = 0;
+
+function initParticles() {
+  pPos     = new Float32Array(P_MAX * 3);
+  pCol     = new Float32Array(P_MAX * 3);
+  pSize    = new Float32Array(P_MAX);
+  pVel     = new Float32Array(P_MAX * 3);
+  pLife    = new Float32Array(P_MAX);
+  pMaxLife = new Float32Array(P_MAX);
+
+  pGeo = new THREE.BufferGeometry();
+  pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+  pGeo.setAttribute('color',    new THREE.BufferAttribute(pCol, 3));
+  pGeo.setAttribute('size',     new THREE.BufferAttribute(pSize, 1));
+
+  pPoints = new THREE.Points(pGeo, new THREE.PointsMaterial({
+    size: 0.06, sizeAttenuation: true, vertexColors: true,
+    transparent: true, opacity: 0.7, depthWrite: false,
+    blending: THREE.AdditiveBlending
+  }));
+  pPoints.frustumCulled = false;
+  scene.add(pPoints);
+}
+
+function resetParticles() {
+  if (!pLife) return;
+  pLife.fill(0); pSize.fill(0);
+  pPos.fill(0); pVel.fill(0); pCol.fill(0);
+  pHead = 0; pAlive = 0;
+  pGeo.attributes.position.needsUpdate = true;
+  pGeo.attributes.color.needsUpdate = true;
+  pGeo.attributes.size.needsUpdate = true;
+}
+
+function spawnParticle(x, y, z, spark) {
+  const i = pHead; pHead = (pHead + 1) % P_MAX;
+  const i3 = i * 3;
+  pPos[i3] = x; pPos[i3 + 1] = y; pPos[i3 + 2] = z;
+
+  const spread = spark ? 0.9 : 0.35;
+  pVel[i3]     = (noiseRand() - 0.5) * spread;
+  pVel[i3 + 1] = (spark ? 0.6 : 0.28) * noiseRand() + 0.05;
+  pVel[i3 + 2] = -sim.speed * (spark ? 0.22 : 0.12) - noiseRand() * 0.4;
+
+  const c = new THREE.Color(spark ? 0xff8a3d : 0x8b929c);
+  pCol[i3] = c.r; pCol[i3 + 1] = c.g; pCol[i3 + 2] = c.b;
+
+  pSize[i] = spark ? 0.035 : 0.05 + noiseRand() * 0.04;
+  pMaxLife[i] = spark ? 0.35 : 0.7 + noiseRand() * 0.5;
+  pLife[i] = pMaxLife[i];
+}
+
+function updateParticles(dt) {
+  if (!pLife) return;
+
+  if (!sim.paused && sim.speed > 0.5) {
+    // spawn rate rises with speed; worn tyres throw sparks instead of dust
+    const rate = Math.min(1, sim.speed / 26);
+    for (let i = 0; i < 4; i++) {
+      if (noiseRand() > rate) continue;
+      const spark = sim.treads[i] < 1.0;
+      const p = TYRE_POS[i];
+      spawnParticle(
+        p[0] + (noiseRand() - 0.5) * 0.18,
+        0.03 + noiseRand() * 0.05,
+        p[2] - TYRE_R - noiseRand() * 0.2,
+        spark
+      );
+    }
+  }
+
+  pAlive = 0;
+  for (let i = 0; i < P_MAX; i++) {
+    if (pLife[i] <= 0) { pSize[i] = 0; continue; }
+    pLife[i] -= dt;
+    if (pLife[i] <= 0) { pSize[i] = 0; continue; }
+    const i3 = i * 3;
+    pPos[i3]     += pVel[i3] * dt;
+    pPos[i3 + 1] += pVel[i3 + 1] * dt;
+    pPos[i3 + 2] += pVel[i3 + 2] * dt;
+    pVel[i3 + 1] -= 1.4 * dt;                 // settle back toward the road
+    if (pPos[i3 + 1] < 0.01) { pPos[i3 + 1] = 0.01; pVel[i3 + 1] *= -0.25; }
+    const f = pLife[i] / pMaxLife[i];
+    pSize[i] *= 0.995;
+    pCol[i3] *= 1; pCol[i3 + 1] *= 1; pCol[i3 + 2] *= 1;
+    pGeo.attributes.color.array[i3]     = pCol[i3] * f;
+    pGeo.attributes.color.array[i3 + 1] = pCol[i3 + 1] * f;
+    pGeo.attributes.color.array[i3 + 2] = pCol[i3 + 2] * f;
+    pAlive++;
+  }
+  pGeo.attributes.position.needsUpdate = true;
+  pGeo.attributes.color.needsUpdate = true;
+  pGeo.attributes.size.needsUpdate = true;
+}
+const ACCURACY_DATA = {"gen":"2026-08-30T11:00:13+00:00","src":"tests/test_estimation_accuracy.py (441-test suite)","prior":4.8,"priorSig":2.5,"treadNew":8.0,"treadLegal":1.6,"steps":20,"rows":[{"n":"normal","tm":0.2,"pm":0.6406,"cv":1.0,"sd":0.0,"off":1.0,"gt":{"FL":5.0,"FR":5.0,"RL":5.0,"RR":5.0},"tc":{"FL":[0.2,0.2,-0.2,0.2,0.0],"FR":[0.2,0.2,-0.2,0.2,0.0],"RL":[0.2,0.2,-0.2,0.2,0.0],"RR":[0.2,0.2,-0.2,0.2,0.0]},"pc":{"FL":[0.6406,0.7103,-0.1748,0.9827,0.6885],"FR":[0.6406,0.7103,-0.1748,0.9827,0.6885],"RL":[0.6406,0.7103,-0.1748,0.9827,0.6885],"RR":[0.6406,0.7103,-0.1748,0.9827,0.6885]}},{"n":"uniform_wear","tm":0.3,"pm":0.6406,"cv":1.0,"sd":0.0,"off":1.0,"gt":{"FL":4.5,"FR":4.5,"RL":4.5,"RR":4.5},"tc":{"FL":[0.3,0.3,0.3,0.3,0.0],"FR":[0.3,0.3,0.3,0.3,0.0],"RL":[0.3,0.3,0.3,0.3,0.0],"RR":[0.3,0.3,0.3,0.3,0.0]},"pc":{"FL":[0.6406,0.7103,-0.1748,0.9827,0.6885],"FR":[0.6406,0.7103,-0.1748,0.9827,0.6885],"RL":[0.6406,0.7103,-0.1748,0.9827,0.6885],"RR":[0.6406,0.7103,-0.1748,0.9827,0.6885]}},{"n":"asymmetric_wear","tm":0.3498,"pm":0.6406,"cv":1.0,"sd":3e-05,"off":1.0,"gt":{"FL":4.8,"FR":4.8,"RL":4.169,"RR":4.032},"tc":{"FL":[0.0,0.0,0.0,0.0,0.0],"FR":[0.0,0.0,0.0,0.0,0.0],"RL":[0.6313,0.6313,0.6313,0.6314,3e-05],"RR":[0.768,0.768,0.768,0.768,3e-05]},"pc":{"FL":[0.6406,0.7103,-0.1748,0.9827,0.6885],"FR":[0.6406,0.7103,-0.1748,0.9827,0.6885],"RL":[0.6285,0.7014,-0.1351,1.022,0.68828],"RR":[0.6527,0.7214,-0.2145,1.0181,0.68873]}},{"n":"low_pressure","tm":0.2,"pm":0.6705,"cv":1.0,"sd":0.00666,"off":1.0,"gt":{"FL":5.0,"FR":5.0,"RL":4.982,"RR":5.018},"tc":{"FL":[0.2,0.2,-0.2,0.2,0.0],"FR":[0.2,0.2,-0.2,0.2,0.0],"RL":[0.1819,0.182,-0.1819,0.1896,0.00661],"RR":[0.2182,0.2183,-0.2182,0.2294,0.00666]},"pc":{"FL":[0.6406,0.7103,-0.1748,0.9827,0.6885],"FR":[0.6406,0.7103,-0.1748,0.9827,0.6885],"RL":[0.6406,0.7106,-0.1726,0.9862,0.68928],"RR":[0.7602,1.0131,0.7445,1.8997,0.68713]}},{"n":"pressure_drift","tm":0.2,"pm":0.6077,"cv":1.0,"sd":0.0,"off":1.0,"gt":{"FL":5.0,"FR":5.0,"RL":5.0,"RR":5.0},"tc":{"FL":[0.2,0.2,-0.2,0.2,0.0],"FR":[0.2,0.2,-0.2,0.2,0.0],"RL":[0.2,0.2,-0.2,0.2,0.0],"RR":[0.2,0.2,-0.2,0.2,0.0]},"pc":{"FL":[0.6077,0.6888,-0.0209,1.1366,0.6885],"FR":[0.6077,0.6888,-0.0209,1.1366,0.6885],"RL":[0.6077,0.6888,-0.0209,1.1366,0.6885],"RR":[0.6077,0.6888,-0.0209,1.1366,0.6885]}},{"n":"toe_misalignment","tm":0.2,"pm":0.6406,"cv":1.0,"sd":1e-05,"off":1.0,"gt":{"FL":5.0,"FR":5.0,"RL":5.0,"RR":5.0},"tc":{"FL":[0.2,0.2,-0.2,0.2,1e-05],"FR":[0.2,0.2,-0.2,0.2,1e-05],"RL":[0.2,0.2,-0.2,0.2,0.0],"RR":[0.2,0.2,-0.2,0.2,0.0]},"pc":{"FL":[0.6406,0.7103,-0.1748,0.9827,0.6885],"FR":[0.6406,0.7103,-0.1748,0.9827,0.6885],"RL":[0.6406,0.7103,-0.1748,0.9827,0.6885],"RR":[0.6406,0.7103,-0.1748,0.9827,0.6885]}},{"n":"sensor_missingness","tm":0.2,"pm":0.6406,"cv":1.0,"sd":0.0,"off":1.0,"gt":{"FL":5.0,"FR":5.0,"RL":5.0,"RR":5.0},"tc":{"FL":[0.2,0.2,-0.2,0.2,0.0],"FR":[0.2,0.2,-0.2,0.2,0.0],"RL":[0.2,0.2,-0.2,0.2,0.0],"RR":[0.2,0.2,-0.2,0.2,0.0]},"pc":{"FL":[0.6406,0.7103,-0.1748,0.9827,0.6885],"FR":[0.6406,0.7103,-0.1748,0.9827,0.6885],"RL":[0.6406,0.7103,-0.1748,0.9827,0.6885],"RR":[0.6406,0.7103,-0.1748,0.9827,0.6885]}},{"n":"accelerated_degradation","tm":0.8,"pm":0.6406,"cv":1.0,"sd":1e-05,"off":1.0,"gt":{"FL":4.0,"FR":4.0,"RL":4.0,"RR":4.0},"tc":{"FL":[0.8,0.8,0.8,0.8,1e-05],"FR":[0.8,0.8,0.8,0.8,1e-05],"RL":[0.8,0.8,0.8,0.8,1e-05],"RR":[0.8,0.8,0.8,0.8,1e-05]},"pc":{"FL":[0.6406,0.7103,-0.1748,0.9827,0.6885],"FR":[0.6406,0.7103,-0.1748,0.9827,0.6885],"RL":[0.6406,0.7103,-0.1748,0.9827,0.6885],"RR":[0.6406,0.7103,-0.1748,0.9827,0.6885]}}]};
+
+/* ==========================================================================
+   PHASE 5 — remaining life, panels, chart, shortcuts, fallback
+   ========================================================================== */
+
+/* ---------------------- sensor packages ---------------------------------- */
+/* One control instead of two checkboxes: a demo needs to flip the whole
+   configuration in a single click and see what the extra hardware buys. */
+const PACKAGES = {
+  base:     { roadLoad: false, lateral: false,
+              label: 'Base (production)',
+              note: 'Wheel speed + TPMS + temperature only. Absolute tread, toe and camber are not identifiable from this set.' },
+  extended: { roadLoad: true,  lateral: true,
+              label: 'Extended (+torque, +lateral)',
+              note: 'Adds a motor-torque road-load estimate and a lateral accelerometer. Both are PROPOSED channels, not fitted hardware.' }
+};
+let activePackage = 'base';
+
+function setPackage(name) {
+  activePackage = name;
+  channels.roadLoad = PACKAGES[name].roadLoad;
+  channels.lateral  = PACKAGES[name].lateral;
+  const rl = document.getElementById('ch-roadload');
+  const la = document.getElementById('ch-lateral');
+  if (rl) rl.checked = channels.roadLoad;
+  if (la) la.checked = channels.lateral;
+  document.querySelectorAll('[data-pkg]').forEach(b =>
+    b.classList.toggle('active', b.dataset.pkg === name));
+  setText('pkg-note', PACKAGES[name].note);
+  runEstimator(); updateUI(true); renderSensors();
+}
+
+/* ==========================================================================
+   Remaining useful life
+   --------------------------------------------------------------------------
+   Mirrors fusion/forecast.py: weighted linear regression of the state against
+   the odometer, then remaining = (threshold - current) / slope, with a 95 %
+   interval from the slope uncertainty.
+
+   The important part is `basis`. forecast.py only forecasts from OBSERVED
+   states, and under the base sensor package tread is WEAK — its estimate does
+   not move with distance, so a regression on it yields a slope of zero and an
+   infinite life. Reporting a tread life anyway would mean quoting the assumed
+   wear rate back as if it had been measured. Each forecast therefore carries
+   how it was obtained:
+
+     MEASURED     tread is OBSERVED and the slope came from the data
+     ASSUMED      from the fitment prior and a nominal wear rate — not measured
+     DIFFERENTIAL only the between-corner difference is measured
+     NONE         not forecastable from this channel set
+   ========================================================================== */
+const TREAD_LEGAL = TYRECFG.tread_legal_mm;
+const PRESS_MIN_FRACTION = 0.80;
+const NOMINAL_WEAR_MM_PER_1000KM = 0.04;
+
+function weightedSlope(xs, ys, sigmas) {
+  const n = xs.length;
+  if (n < 3) return null;
+  let sw = 0, swx = 0, swy = 0;
+  for (let i = 0; i < n; i++) {
+    const w = 1 / Math.max(sigmas[i] * sigmas[i], 1e-9);
+    sw += w; swx += w * xs[i]; swy += w * ys[i];
+  }
+  const xbar = swx / sw, ybar = swy / sw;
+  let sxx = 0, sxy = 0;
+  for (let i = 0; i < n; i++) {
+    const w = 1 / Math.max(sigmas[i] * sigmas[i], 1e-9);
+    sxx += w * (xs[i] - xbar) * (xs[i] - xbar);
+    sxy += w * (xs[i] - xbar) * (ys[i] - ybar);
+  }
+  if (sxx < 1e-12) return null;
+  const slope = sxy / sxx;
+  const intercept = ybar - slope * xbar;
+  let ssRes = 0, ssTot = 0, chi2 = 0;
+  for (let i = 0; i < n; i++) {
+    const w = 1 / Math.max(sigmas[i] * sigmas[i], 1e-9);
+    const r = ys[i] - (intercept + slope * xs[i]);
+    ssRes += r * r; ssTot += (ys[i] - ybar) * (ys[i] - ybar); chi2 += w * r * r;
+  }
+  const slopeSE = Math.sqrt(Math.max(chi2 / Math.max(n - 2, 1), 1e-18) / sxx);
+  const r2 = ssTot > 1e-18 ? Math.max(0, 1 - ssRes / ssTot) : 0;
+  return { slope, intercept, slopeSE, r2, n };
+}
+
+function urgencyOf(remainingKm) {
+  if (!isFinite(remainingKm)) return { label: 'UNKNOWN', cls: 'badge-mut' };
+  if (remainingKm < 1000)  return { label: 'CRITICAL', cls: 'badge-bad' };
+  if (remainingKm < 5000)  return { label: 'HIGH',     cls: 'badge-bad' };
+  if (remainingKm < 20000) return { label: 'MEDIUM',   cls: 'badge-warn' };
+  return { label: 'LOW', cls: 'badge-ok' };
+}
+
+function computeLife() {
+  const r = sim.estResult;
+  if (!r) return null;
+  const out = { corners: [], differential: null, pressure: [], basis: 'NONE' };
+
+  const hist = sim.history;
+  const xs = hist.map(h => h.km);
+
+  for (let i = 0; i < 4; i++) {
+    const st = r.states[i];
+    const tread = st.value;
+    const lifeFrac = Math.max(0, Math.min(1,
+      (tread - TREAD_LEGAL) / (TYRECFG.tread_new_mm - TREAD_LEGAL)));
+
+    let slope = null, basis = 'NONE', fit = null;
+    if (st.obs === 'OBSERVED' && hist.length >= 5) {
+      fit = weightedSlope(xs, hist.map(h => h.e[i]), hist.map(() => st.sigma));
+      if (fit && fit.slope < -1e-9) { slope = fit.slope; basis = 'MEASURED'; }
+    }
+    if (slope === null && priorMode.fitment) {
+      slope = -NOMINAL_WEAR_MM_PER_1000KM * WEAR_ACCEL / 1000;
+      basis = 'ASSUMED';
+    }
+
+    let remaining = Infinity, lo = 0, hi = Infinity;
+    if (slope !== null && slope < 0) {
+      remaining = Math.max(0, (TREAD_LEGAL - tread) / slope);
+      const se = fit ? fit.slopeSE : Math.abs(slope) * 0.3;   // forecast.py uses 30 %
+      const sHi = slope - 1.96 * se, sLo = slope + 1.96 * se;
+      lo = sLo < 0 ? Math.max(0, (TREAD_LEGAL - tread) / sLo) : Infinity;
+      hi = sHi < 0 ? Math.max(0, (TREAD_LEGAL - tread) / sHi) : Infinity;
+      if (lo > hi) { const t = lo; lo = hi; hi = t; }
+    }
+    out.corners.push({
+      corner: CORNERS[i], tread, sigma: st.sigma, lifeFrac,
+      slopePer1000km: slope === null ? null : slope * 1000,
+      remainingKm: remaining, ciKm: [lo, hi], basis,
+      r2: fit ? fit.r2 : 0, obs: st.obs,
+      urgency: urgencyOf(remaining)
+    });
+  }
+
+  /* Differential wear is measurable even when the absolute level is not, so a
+     rotation/alignment forecast is available under the base package too. */
+  const dFront = Math.abs(r.states[0].value - r.states[1].value);
+  const dRear  = Math.abs(r.states[2].value - r.states[3].value);
+  const worst = Math.max(dFront, dRear);
+  let dSlope = null;
+  if (hist.length >= 5) {
+    const f = weightedSlope(xs, hist.map(h => Math.abs(h.e[2] - h.e[3])),
+                            hist.map(() => r.states[2].sigma));
+    if (f && f.slope > 1e-12) dSlope = f.slope;
+  }
+  const DIFF_LIMIT_MM = 1.5;
+  out.differential = {
+    frontDelta: dFront, rearDelta: dRear, worst,
+    limit: DIFF_LIMIT_MM,
+    remainingKm: dSlope ? Math.max(0, (DIFF_LIMIT_MM - worst) / dSlope) : Infinity,
+    exceeded: worst > DIFF_LIMIT_MM,
+    basis: 'DIFFERENTIAL'
+  };
+
+  for (let i = 0; i < 4; i++) {
+    const st = r.states[4 + i];
+    const limit = TYRECFG.placard_kpa * PRESS_MIN_FRACTION;
+    out.pressure.push({
+      corner: CORNERS[i], value: st.value, sigma: st.sigma, limit,
+      below: st.value < limit, obs: st.obs
+    });
+  }
+
+  out.basis = out.corners[0].basis;
+  return out;
+}
+
+/* ------------------------------ life panel ------------------------------- */
+const BASIS_BADGE = {
+  MEASURED:     'badge-ok',
+  ASSUMED:      'badge-warn',
+  DIFFERENTIAL: 'badge-accent',
+  NONE:         'badge-mut'
+};
+const BASIS_TEXT = {
+  MEASURED:     'Slope regressed from OBSERVED tread estimates.',
+  ASSUMED:      'From the fitment prior and a nominal wear rate. NOT measured — this is the assumption quoted back.',
+  DIFFERENTIAL: 'Only the between-corner difference is measured.',
+  NONE:         'Not forecastable from this channel set.'
+};
+
+function fmtKm(v) {
+  if (!isFinite(v)) return '—';
+  if (v >= 1000) return (v / 1000).toFixed(1) + 'k km';
+  return Math.round(v) + ' km';
+}
+
+function renderLifePanel() {
+  const el = document.getElementById('life-body');
+  if (!el) return;
+  const L = computeLife();
+  if (!L) return;
+
+  const worstCorner = L.corners.reduce((a, b) => a.lifeFrac < b.lifeFrac ? a : b);
+  const worstRemain = L.corners.reduce((a, b) => a.remainingKm < b.remainingKm ? a : b);
+
+  let h = '<div class="stat-grid" style="margin-bottom:8px;">' +
+    '<div class="stat-block"><div class="k">Life remaining</div><div class="v">' +
+      (worstCorner.lifeFrac * 100).toFixed(0) + '<span style="font-size:11px;">%</span></div></div>' +
+    '<div class="stat-block ' + (worstRemain.urgency.cls === 'badge-bad' ? 'bad' : '') +
+      '"><div class="k">Distance to limit</div><div class="v sm">' + fmtKm(worstRemain.remainingKm) + '</div></div>' +
+    '</div>';
+
+  h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:7px;">' +
+       '<span class="badge ' + BASIS_BADGE[L.basis] + '" title="' + BASIS_TEXT[L.basis] + '">BASIS: ' + L.basis + '</span>' +
+       '<span class="badge ' + worstRemain.urgency.cls + '">' + worstRemain.urgency.label + '</span></div>';
+
+  for (const c of L.corners) {
+    const pct = (c.lifeFrac * 100);
+    h += '<div style="margin:6px 0;">' +
+      '<div style="display:flex;justify-content:space-between;font-family:var(--font-m);font-size:10px;">' +
+        '<span class="dim">' + c.corner + '</span>' +
+        '<span>' + c.tread.toFixed(2) + ' ±' + c.sigma.toFixed(2) + ' mm</span></div>' +
+      '<div class="wear-bar"><div class="wear-fill" style="width:' + pct.toFixed(1) +
+        '%;background:' + treadCssVar(c.tread) + ';"></div></div>' +
+      '<div style="display:flex;justify-content:space-between;font-family:var(--font-m);font-size:9px;color:var(--txt-mut);">' +
+        '<span>' + pct.toFixed(0) + '% life</span>' +
+        '<span>' + fmtKm(c.remainingKm) + '</span></div></div>';
+  }
+
+  const d = L.differential;
+  h += '<div class="panel-title" style="margin-top:10px;">Differential wear</div>' +
+    '<div class="kv"><span class="k">Front Δ</span><span class="v">' + d.frontDelta.toFixed(2) + ' mm</span></div>' +
+    '<div class="kv"><span class="k">Rear Δ</span><span class="v" style="color:' +
+      (d.rearDelta > d.limit ? 'var(--bad)' : 'var(--txt)') + '">' + d.rearDelta.toFixed(2) + ' mm</span></div>' +
+    '<div class="kv"><span class="k">Rotation limit</span><span class="v">' + d.limit.toFixed(1) + ' mm</span></div>' +
+    '<div class="mono mut" style="font-size:9px;line-height:1.5;margin-top:5px;">' +
+      'Measurable under every package — the axle ratio sees the difference even when the level is unknown.</div>';
+
+  el.innerHTML = h;
+}
+
+/* --------------------------- degradation chart --------------------------- */
+function drawChart() {
+  const cv = document.getElementById('wear-chart');
+  if (!cv || !cv.offsetParent) return;
+  const dpr = Math.min(window.devicePixelRatio, 2);
+  const w = cv.clientWidth, hgt = cv.clientHeight;
+  if (w < 10 || hgt < 10) return;
+  if (cv.width !== w * dpr || cv.height !== hgt * dpr) { cv.width = w * dpr; cv.height = hgt * dpr; }
+  const g = cv.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, w, hgt);
+
+  const padL = 40, padR = 96, padT = 10, padB = 22;
+  const plotW = w - padL - padR, plotH = hgt - padT - padB;
+  const hist = sim.history;
+
+  const xMax = Math.max(100, sim.distKm * 1.05);
+  const yMin = 0, yMax = TYRECFG.tread_new_mm + 0.5;
+  const X = km => padL + (km / xMax) * plotW;
+  const Y = mm => padT + (1 - (mm - yMin) / (yMax - yMin)) * plotH;
+
+  g.strokeStyle = 'rgba(255,255,255,0.06)'; g.lineWidth = 1;
+  g.font = '9px "JetBrains Mono", monospace';
+  g.fillStyle = '#656b74';
+  for (let mm = 0; mm <= yMax; mm += 2) {
+    g.beginPath(); g.moveTo(padL, Y(mm)); g.lineTo(padL + plotW, Y(mm)); g.stroke();
+    g.textAlign = 'right'; g.fillText(mm.toFixed(0), padL - 6, Y(mm) + 3);
+  }
+  g.textAlign = 'center';
+  for (let f = 0; f <= 4; f++) {
+    const km = xMax * f / 4;
+    g.fillText(km >= 1000 ? (km / 1000).toFixed(1) + 'k' : km.toFixed(0), X(km), hgt - 7);
+  }
+
+  // legal limit
+  g.strokeStyle = 'rgba(207,106,92,0.55)'; g.setLineDash([4, 3]);
+  g.beginPath(); g.moveTo(padL, Y(TREAD_LEGAL)); g.lineTo(padL + plotW, Y(TREAD_LEGAL)); g.stroke();
+  g.setLineDash([]);
+  g.fillStyle = '#cf6a5c'; g.textAlign = 'left';
+  g.fillText('legal ' + TREAD_LEGAL.toFixed(1) + ' mm', padL + 4, Y(TREAD_LEGAL) - 4);
+
+  if (hist.length < 2) {
+    g.fillStyle = '#656b74'; g.textAlign = 'center';
+    g.fillText('collecting snapshots…', padL + plotW / 2, padT + plotH / 2);
+    return;
+  }
+
+  const colours = ['#6fa8d4', '#a8836a', '#6ebf8b', '#d4a24c'];
+  for (let i = 0; i < 4; i++) {
+    // ground truth: solid
+    g.strokeStyle = colours[i]; g.lineWidth = 1.4; g.globalAlpha = 1;
+    g.beginPath();
+    hist.forEach((p, k) => { const x = X(p.km), y = Y(p.t[i]); k ? g.lineTo(x, y) : g.moveTo(x, y); });
+    g.stroke();
+    // estimate: dashed
+    g.setLineDash([3, 3]); g.globalAlpha = 0.75; g.lineWidth = 1;
+    g.beginPath();
+    hist.forEach((p, k) => { const x = X(p.km), y = Y(p.e[i]); k ? g.lineTo(x, y) : g.moveTo(x, y); });
+    g.stroke();
+    g.setLineDash([]); g.globalAlpha = 1;
+  }
+
+  // legend
+  g.textAlign = 'left'; g.font = '9px "JetBrains Mono", monospace';
+  for (let i = 0; i < 4; i++) {
+    const yy = padT + 10 + i * 13;
+    g.fillStyle = colours[i];
+    g.fillRect(padL + plotW + 10, yy - 6, 8, 2);
+    g.fillStyle = '#969ca5';
+    g.fillText(CORNERS[i] + '  ' + sim.treads[i].toFixed(2), padL + plotW + 22, yy - 2);
+  }
+  g.fillStyle = '#656b74';
+  g.fillText('solid = truth', padL + plotW + 10, padT + 10 + 4 * 13 + 2);
+  g.fillText('dashed = est.', padL + plotW + 10, padT + 10 + 4 * 13 + 14);
+}
+
+/* ------------------------------ accuracy tab ----------------------------- */
+/* Sweeps every scenario under both sensor packages and reports what the system
+   actually resolves. Computed live from this build, not transcribed, so it
+   cannot drift away from the estimator it describes. Cached — it is a sweep. */
+let capabilityCache = null;
+let capabilitySweeping = false;
+function computeCapability() {
+  if (capabilityCache) return capabilityCache;
+  // the sweep calls initSim(), which calls updateUI(), which renders this tab.
+  // Without a re-entry guard that recurses until the stack blows.
+  if (capabilitySweeping) return [];
+  capabilitySweeping = true;
+  try { return capabilitySweep(); } finally { capabilitySweeping = false; }
+}
+
+function capabilitySweep() {
+  const keep = { idx: sim.scenarioIdx, rl: channels.roadLoad, la: channels.lateral,
+                 fit: priorMode.fitment, paused: sim.paused };
+  const acc = { absTread: [], diffTread: [], press: [], toe: [], camber: [] };
+
+  for (const pkg of ['base', 'extended']) {
+    channels.roadLoad = PACKAGES[pkg].roadLoad;
+    channels.lateral  = PACKAGES[pkg].lateral;
+    for (let s = 0; s < SCENARIOS.length; s++) {
+      sim.scenarioIdx = s; initSim(); sim.paused = true; runEstimator();
+      const r = sim.estResult, xt = trueState();
+      for (let i = 0; i < 4; i++) acc.absTread.push(Math.abs(r.states[i].value - xt[i]));
+      acc.diffTread.push(Math.abs((r.states[1].value - r.states[0].value) - (xt[1] - xt[0])));
+      acc.diffTread.push(Math.abs((r.states[3].value - r.states[2].value) - (xt[3] - xt[2])));
+      for (let i = 4; i < 8; i++) acc.press.push(Math.abs(r.states[i].value - xt[i]));
+      if (r.states[8].obs === 'OBSERVED')
+        acc.toe.push(Math.abs(Math.sqrt(Math.max(0, r.states[8].value)) - Math.sqrt(Math.max(0, xt[8]))));
+      if (r.states[9].obs === 'OBSERVED') acc.camber.push(Math.abs(r.states[9].value - xt[9]));
+    }
+  }
+  const mean = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : NaN;
+  const worst = a => a.length ? Math.max(...a) : NaN;
+
+  sim.scenarioIdx = keep.idx; channels.roadLoad = keep.rl; channels.lateral = keep.la;
+  priorMode.fitment = keep.fit; initSim(); sim.paused = keep.paused; runEstimator();
+
+  capabilityCache = [
+    { q: 'Tyre pressure, per corner',      mean: mean(acc.press),     worst: worst(acc.press),     unit: 'kPa',  verdict: 'MEASURED',      pkg: 'base', why: 'TPMS measures it directly. Variance reduction 0.985.' },
+    { q: 'Tread difference, within axle',  mean: mean(acc.diffTread), worst: worst(acc.diffTread), unit: 'mm',   verdict: 'MEASURED',      pkg: 'base', why: 'The axle speed ratio responds to the difference in rolling radius.' },
+    { q: 'Camber angle (incl. sign)',      mean: mean(acc.camber),    worst: worst(acc.camber),    unit: '°',    verdict: 'MEASURED',      pkg: 'ext',  why: 'Camber thrust appears in lateral acceleration. Needs the proposed accelerometer.' },
+    { q: 'Toe angle (magnitude only)',     mean: mean(acc.toe),       worst: worst(acc.toe),       unit: '°',    verdict: 'MEASURED',      pkg: 'ext',  why: 'Toe drag appears in road load. Sign is not recoverable — drag is even in toe.' },
+    { q: 'Absolute tread depth',           mean: mean(acc.absTread),  worst: worst(acc.absTread),  unit: 'mm',   verdict: 'NOT RECOVERABLE', pkg: '—',  why: 'No channel resolves the common mode. Road load gives dF/dtread ≈ 1 N/mm against ~8 N noise — SNR below 1. Needs a direct tread sensor.' }
+  ];
+  return capabilityCache;
+}
+
+let accuracyRendered = false;
+function renderAccuracy() {
+  const pane = document.getElementById('pane-accuracy');
+  if (!pane || !pane.classList.contains('active')) return;
+  if (accuracyRendered) return;          // static content — build the DOM once
+  const A = ACCURACY_DATA;
+
+  const cap = computeCapability();
+  if (!cap.length) return;   // sweep in progress; the tab redraws when it lands
+
+  let h = '<div class="panel-title" style="margin:0 0 6px;">What this system resolves — swept live over all ' +
+    SCENARIOS.length + ' scenarios, both packages</div><table class="dt"><thead><tr>' +
+    '<th>Quantity</th><th style="text-align:right">Mean err</th><th style="text-align:right">Worst</th>' +
+    '<th>Needs</th><th>Verdict</th><th>Why</th></tr></thead><tbody>';
+  for (const c of cap) {
+    const ok = c.verdict === 'MEASURED';
+    h += '<tr><td>' + c.q + '</td>' +
+      '<td class="num" style="color:' + (ok ? 'var(--ok)' : 'var(--bad)') + '">' +
+        (isNaN(c.mean) ? '—' : (c.mean < 0.1 ? c.mean.toFixed(3) : c.mean.toFixed(2)) + ' ' + c.unit) + '</td>' +
+      '<td class="sig">' + (isNaN(c.worst) ? '—' : c.worst.toFixed(2) + ' ' + c.unit) + '</td>' +
+      '<td class="sig">' + (c.pkg === 'ext' ? '<span class="badge badge-accent">EXT</span>'
+                          : c.pkg === 'base' ? '<span class="badge badge-mut">base</span>' : '—') + '</td>' +
+      '<td><span class="badge ' + (ok ? 'badge-ok' : 'badge-bad') + '">' + c.verdict + '</span></td>' +
+      '<td class="mut" style="font-size:9.5px;">' + c.why + '</td></tr>';
+  }
+  accuracyRendered = true;
+  h += '</tbody></table>';
+  h += '<div class="note note-info">The four MEASURED rows are what the demo should be judged on. ' +
+    'Absolute tread depth is the one quantity the sensor set cannot deliver, and no prior, package or solver ' +
+    'setting changes that — it is an observability result, not a tuning failure.</div>';
+
+  h += '<div class="panel-title" style="margin:14px 0 6px;">Python suite output</div>';
+  h += '<div class="mono mut" style="font-size:9.5px;margin-bottom:7px;">Source: ' + A.src +
+    ' · generated ' + A.gen + ' · ' + A.steps + ' steps/scenario · prior tread ' +
+    A.prior.toFixed(2) + ' mm ± ' + A.priorSig.toFixed(1) + '</div>';
+
+  h += '<table class="dt"><thead><tr><th>Scenario</th>' +
+    '<th style="text-align:right">Tread MAE</th><th style="text-align:right">Press MAE</th>' +
+    '<th style="text-align:right">2σ cover</th><th style="text-align:right">Error SD</th>' +
+    '<th style="text-align:right">Offset frac</th><th style="text-align:right">Implied GT</th>' +
+    '</tr></thead><tbody>';
+  for (const r of A.rows) {
+    const gts = Object.values(r.gt);
+    const gtRange = Math.min(...gts).toFixed(2) + '–' + Math.max(...gts).toFixed(2);
+    h += '<tr><td>' + r.n + '</td>' +
+      '<td class="num">' + r.tm.toFixed(4) + '</td>' +
+      '<td class="num">' + r.pm.toFixed(4) + '</td>' +
+      '<td class="sig">' + (r.cv * 100).toFixed(0) + '%</td>' +
+      '<td class="sig" style="color:var(--warn)">' + r.sd.toFixed(5) + '</td>' +
+      '<td class="sig" style="color:var(--warn)">' + (r.off * 100).toFixed(1) + '%</td>' +
+      '<td class="sig">' + gtRange + '</td></tr>';
+  }
+  h += '</tbody></table>';
+
+  h += '<div class="note note-warn"><b>Read the last three columns before the first.</b> ' +
+    'Error SD is the spread of the tread error across the ' + A.steps + ' timesteps: it is ≤ 0.007 mm everywhere, ' +
+    'meaning the tread estimate does not move. Offset fraction is 100 % in every scenario — the entire error is a ' +
+    'constant bias. Every implied ground truth sits within 0.80 mm of the ' + A.prior.toFixed(2) + ' mm prior. ' +
+    'So the Tread MAE column measures the distance from the prior to a ground truth that was set near the prior, ' +
+    'not the estimator\'s ability to measure tread. The suite\'s own assertion agrees: ' +
+    '<span class="mono">assert mean_tread_mae &lt; 2.5</span>, commented "WEAK observability, starts from prior". ' +
+    'The Press MAE column IS a real accuracy figure — pressure is OBSERVED via TPMS.</div>';
+
+  h += '<div class="note note-info">ALL VALUES UNVALIDATED. Model-vs-model comparison against the generating ' +
+    'simulation, not real-world validation. Pressure = OBSERVED (TPMS). Tread = WEAK under the base package ' +
+    '(within-axle difference only). Toe and camber = UNOBSERVABLE without the proposed channels. ' +
+    'Reference points for context only: NHTSA TPMS accuracy spec, SAE J2657.</div>';
+
+  pane.innerHTML = h;
+}
+
+/* ------------------------------- physics tab ----------------------------- */
+let physicsRendered = false;
+function renderPhysics() {
+  const pane = document.getElementById('pane-physics');
+  if (!pane || !pane.classList.contains('active')) return;
+  if (physicsRendered) return;           // static equations — build the DOM once
+  physicsRendered = true;
+  pane.innerHTML =
+  '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
+  '<div>' +
+    '<div class="eqn">r_eff = (r_belt + tread/1000) − k·(F_z / k_z)\n' +
+      'k_z   = k_z0 · (p / p_placard)\n' +
+      'k     = ' + PHYS.deflection_factor.toFixed(4) + ',  k_z0 = ' + PHYS.k_z0.toLocaleString() + ' N/m' +
+      '<span class="cap">Effective rolling radius. This is the channel that makes tread visible at all — ' +
+      'and only through the RATIO between two wheels.</span></div>' +
+    '<div class="eqn">C_rr = C_rr0 · (p_placard/p)^n · [(1−s) + s·(tread/tread_new)] · [1 + a(T − T_ref)]\n' +
+      'C_rr0 = ' + PHYS.c_rr0 + ',  n = ' + PHYS.p_exponent + ',  s = ' + PHYS.tread_rr_span + ',  a = ' + PHYS.t_coeff +
+      '<span class="cap">Rolling resistance. Worn tyres roll EASIER (s-term &lt; 1). ' +
+      'The s-term is the only path to absolute tread — it needs the road-load channel.</span></div>' +
+    '<div class="eqn">F_toe = 2·C_α·(π/180)²·toe²      C_α = ' + PHYS.cornering_stiffness.toLocaleString() + ' N/rad' +
+      '<span class="cap">Toe drag is EVEN in toe, so the sign is not recoverable. Magnitude only.</span></div>' +
+    '<div class="eqn">a_y = 4·C_γ·(π/180)·γ / m        C_γ = ' + PHYS.camber_stiffness.toLocaleString() + ' N/rad' +
+      '<span class="cap">Camber thrust. Requires a lateral accelerometer. Unlike toe, the SIGN is recoverable. ' +
+      'Assumes all four wheels lean the same way — a mirrored camber error cancels and stays invisible.</span></div>' +
+  '</div>' +
+  '<div>' +
+    '<div class="eqn">x̂ = argmin ‖z − h(x)‖²_R⁻¹ + ‖x − x₀‖²_P₀⁻¹\n' +
+      'P = (P₀⁻¹ + HᵀR⁻¹H)⁻¹' +
+      '<span class="cap">Gauss-Newton MAP. The posterior is the full matrix, not a diagonal — the common-mode ' +
+      'test below needs an off-diagonal direction.</span></div>' +
+    '<div class="eqn">vr_j   = 1 − P_jj / P₀_jj\n' +
+      'u      = (e_i + e_j)/√2\n' +
+      'cm_red = 1 − uᵀPu / uᵀP₀u' +
+      '<span class="cap">Observability. If cm_red &lt; 0.01 the axle pair is DIFFERENTIAL-ONLY and both corners ' +
+      'are demoted to WEAK: the level is not recoverable, only the difference.</span></div>' +
+    '<div class="eqn">m·ẍ = −k·x − c·ẋ      ω = ' + Math.sqrt(SUSP_K / SUSP_M).toFixed(2) +
+      ' rad/s,  ζ = ' + (SUSP_C / (2 * Math.sqrt(SUSP_K * SUSP_M))).toFixed(2) +
+      '<span class="cap">Body heave, ' + (Math.sqrt(SUSP_K / SUSP_M) / (2 * Math.PI)).toFixed(2) +
+      ' Hz. Semi-implicit Euler.</span></div>' +
+    '<div class="eqn">dT/dt = C_rr·F_z·v / C_th − (T − T_amb)/τ\n' +
+      'C_th = ' + TH_CAPACITY.toLocaleString() + ' J/K,  τ = ' + TH_TAU + ' s' +
+      '<span class="cap">Lumped tyre thermal model. ≈ +18 °C at 20 m/s.</span></div>' +
+    '<div class="eqn">TIME_SCALE = ' + TIME_SCALE + '×      WEAR_ACCEL = ' + WEAR_ACCEL + '×' +
+      '<span class="cap">DEMO PARAMETERS, not physics. The 3D view runs in real time; the odometer, wear, ' +
+      'pressure drift and thermal states advance faster so a 1000 km run fits in a demo slot.</span></div>' +
+  '</div></div>' +
+  '<div class="note note-warn">Every constant above is an UNVALIDATED engineering guess carried from the legacy ' +
+    'reference implementation. None has been checked against bench data. Vehicle: ' + VEHICLE.mass_kg + ' kg, ' +
+    'front weight fraction ' + VEHICLE.front_weight_fraction + '. Tyre: r_belt ' + TYRECFG.r_belt_m + ' m, ' +
+    'new ' + TYRECFG.tread_new_mm + ' mm, legal ' + TYRECFG.tread_legal_mm + ' mm, placard ' +
+    TYRECFG.placard_kpa + ' kPa.</div>';
+}
+
+/* ------------------------------ wear tab --------------------------------- */
+function renderWearTab() {
+  const pane = document.getElementById('pane-wear');
+  if (!pane || !pane.classList.contains('active')) return;
+  const L = computeLife();
+  if (!L) return;
+
+  if (!document.getElementById('wear-chart')) {
+    pane.innerHTML =
+      '<div style="display:flex;gap:12px;align-items:stretch;">' +
+        '<canvas id="wear-chart" style="flex:1;height:150px;"></canvas>' +
+        '<div id="wear-side" style="width:320px;"></div>' +
+      '</div><div id="wear-note"></div>';
+  }
+
+  const side = document.getElementById('wear-side');
+  let h = '<table class="dt"><thead><tr><th>Corner</th>' +
+    '<th style="text-align:right">Tread</th><th style="text-align:right">Life</th>' +
+    '<th style="text-align:right">Rate /1000km</th><th style="text-align:right">To limit</th>' +
+    '<th>Basis</th></tr></thead><tbody>';
+  for (const c of L.corners) {
+    h += '<tr title="' + BASIS_TEXT[c.basis] + '"><td>' + c.corner + '</td>' +
+      '<td class="num" style="color:' + treadCssVar(c.tread) + '">' + c.tread.toFixed(2) + '</td>' +
+      '<td class="sig">' + (c.lifeFrac * 100).toFixed(0) + '%</td>' +
+      '<td class="sig">' + (c.slopePer1000km === null ? '—' : Math.abs(c.slopePer1000km).toFixed(3)) + '</td>' +
+      '<td class="num">' + fmtKm(c.remainingKm) + '</td>' +
+      '<td><span class="badge ' + BASIS_BADGE[c.basis] + '">' + c.basis + '</span></td></tr>';
+  }
+  h += '</tbody></table>';
+  side.innerHTML = h;
+
+  document.getElementById('wear-note').innerHTML =
+    '<div class="note ' + (L.basis === 'MEASURED' ? 'note-info' : 'note-warn') + '">' +
+    '<b>BASIS ' + L.basis + '.</b> ' + BASIS_TEXT[L.basis] +
+    (L.basis === 'ASSUMED'
+      ? ' Under the base sensor package the absolute tread estimate does not move with distance, so a regression on ' +
+        'it returns a zero slope and an infinite life. The figure shown is the nominal wear rate fed back — switch to ' +
+        'the Extended package to make the slope measured.'
+      : '') +
+    ' Legal limit ' + TREAD_LEGAL + ' mm. Rotation threshold ' + L.differential.limit + ' mm between corners.</div>';
+
+  drawChart();
+}
+
+/* --------------------------- keyboard shortcuts -------------------------- */
+function initShortcuts() {
+  window.addEventListener('keydown', e => {
+    if (e.target && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
+    const k = e.key;
+    if (k === ' ') { e.preventDefault(); sim.paused = !sim.paused; setPlayIcon(); return; }
+    if (k === 'r' || k === 'R') { initSim(); return; }
+    if (k === 'c' || k === 'C') {
+      const front = document.getElementById('cam-front');
+      (front.classList.contains('active') ? document.getElementById('cam-orbit') : front).click();
+      return;
+    }
+    if (k === 'p' || k === 'P') { setPackage(activePackage === 'base' ? 'extended' : 'base'); return; }
+    if (/^[0-9]$/.test(k)) {
+      const idx = k === '0' ? 9 : (+k - 1);
+      if (idx < SCENARIOS.length) { sim.scenarioIdx = idx; initSim(); }
+    }
+  });
+}
+
+/* ---------------------------- 2D fallback -------------------------------- */
+/* If WebGL is unavailable the estimator is unaffected — it is plain arithmetic.
+   Render the numbers without the viewport rather than showing a dead page. */
+function startFallbackDashboard() {
+  const host = document.getElementById('fatal');
+  host.innerHTML =
+    '<div style="width:100%;max-width:1100px;">' +
+      '<div class="glass" style="padding:16px 20px;margin-bottom:12px;">' +
+        '<div style="font-size:15px;font-weight:600;color:var(--warn);margin-bottom:4px;">' +
+          '3D viewport unavailable — estimator running in 2D mode</div>' +
+        '<div class="mono dim" style="font-size:10.5px;" id="fb-reason"></div></div>' +
+      '<div class="glass" style="padding:14px 18px;"><div id="fb-body"></div></div></div>';
+
+  const tick = () => {
+    try {
+      simStep(1 / 30);
+      runEstimator();
+      const r = sim.estResult, xt = trueState();
+      let h = '<div class="mono" style="font-size:11px;margin-bottom:8px;">' +
+        SCENARIOS[sim.scenarioIdx].name + ' · ' + sim.distKm.toFixed(1) + ' km · ' +
+        r.nObs + '/10 observed · ' + (r.converged ? 'converged' : 'NOT converged') + '</div>';
+      h += '<table class="dt"><thead><tr><th>State</th><th style="text-align:right">Estimate</th>' +
+        '<th style="text-align:right">σ</th><th style="text-align:right">Truth</th>' +
+        '<th>Observability</th></tr></thead><tbody>';
+      r.states.forEach((s, j) => {
+        const dp = j < 4 ? 2 : j < 8 ? 1 : 3;
+        h += '<tr><td>' + s.name + '</td><td class="num">' + s.value.toFixed(dp) + '</td>' +
+          '<td class="sig">' + s.sigma.toFixed(dp) + '</td><td class="sig">' + xt[j].toFixed(dp) + '</td>' +
+          '<td><span class="badge ' + OBS_CLASS[s.obs] + '">' + s.obs + '</span></td></tr>';
+      });
+      h += '</tbody></table>';
+      document.getElementById('fb-body').innerHTML = h;
+    } catch (e) { /* keep the dashboard alive */ }
+    setTimeout(tick, 200);
+  };
+  tick();
+}
+/* ---------- resize: rAF-debounced, ResizeObserver-driven ----------------- */
+let resizeQueued = false, lastW = 0, lastH = 0;
+function applyResize() {
+  resizeQueued = false;
+  if (!renderer || !viewportEl) return;
+  const w = viewportEl.clientWidth;
+  const h = viewportEl.clientHeight;
+  if (w < 2 || h < 2) { onResize(); return; }
+  if (w === lastW && h === lastH) return;
+  lastW = w; lastH = h;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(w, h, false);
+  setText('rt-size', w + '×' + h);
+}
+function onResize() {
+  if (resizeQueued) return;
+  resizeQueued = true;
+  requestAnimationFrame(applyResize);
+}
+
+/* ------------------------------ render loop ------------------------------ */
+let lastTime = 0, fpsAccum = 0, fpsFrames = 0, frameCount = 0;
+
+function animate(time) {
+  requestAnimationFrame(animate);
+  const dt = Math.min((time - lastTime) / 1000, 0.05);
+  lastTime = time;
+  frameCount++;
+
+  const subSteps = Math.min(4, Math.max(1, Math.ceil(dt / 0.005)));
+  const subDt = dt / subSteps;
+  for (let s = 0; s < subSteps; s++) simStep(subDt);
+
+  if (!sim.paused) {
+    sim.estAccum += dt;
+    if (sim.estAccum >= 1 / ESTIMATOR_HZ) { sim.estAccum = 0; runEstimator(); }
+  }
+
+  // body attitude — carGroup itself never moves
+  bodyGroup.position.y = Math.max(-SUSP_CLAMP, Math.min(SUSP_CLAMP, sim.suspDisp));
+  bodyGroup.rotation.x = sim.pitch;
+
+  const travel = sim.paused ? 0 : sim.speed * dt;
+  const rot = (sim.speed / TYRE_R) * dt;
+  if (!sim.paused) for (let i = 0; i < 4; i++) tyreSpins[i].rotation.x += rot;
+
+  for (let i = 0; i < dashes.length; i++) {
+    dashes[i].position.z -= travel;
+    if (dashes[i].position.z < -ROAD_HALF) dashes[i].position.z += ROAD_SPAN;
+  }
+  for (let i = 0; i < scrollers.length; i++) {
+    scrollers[i].position.z -= travel;
+    if (scrollers[i].position.z < -ROAD_HALF) scrollers[i].position.z += ROAD_SPAN;
+  }
+
+  const prevBumpZ = bumpZ;
+  bumpZ -= travel;
+  if (prevBumpZ > 0 && bumpZ <= 0) bumpImpulse();
+  if (bumpZ < -ROAD_HALF) bumpZ += BUMP_PERIOD;
+  bumpMesh.position.z = bumpZ;
+
+  if (frameCount % 2 === 0) {
+    applyAlignment(Math.sqrt(Math.max(0, sim.toeSq)), sim.camber);
+    updateTyreVisuals();
+    updateParticles(dt * 2);
+    updateUI(false);
+  }
+
+  fpsAccum += dt; fpsFrames++;
+  if (fpsAccum >= 0.5) {
+    setText('rt-fps', String(Math.round(fpsFrames / fpsAccum)));
+    setText('rt-calls', String(renderer.info.render.calls));
+    setText('rt-tris', renderer.info.render.triangles.toLocaleString());
+    fpsAccum = 0; fpsFrames = 0;
+  }
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+function setText(id, v) { const el = document.getElementById(id); if (el) el.textContent = v; }
+
+/* ---------------------------------- boot --------------------------------- */
+window.addEventListener('load', () => {
+  if (typeof THREE === 'undefined')               { fatal('three.js failed to load from CDN.'); return; }
+  if (typeof THREE.OrbitControls === 'undefined') { fatal('OrbitControls failed to load from CDN.'); return; }
+  try {
+    initThree();
+    buildRoad();
+    buildEnvironment();
+    buildCar();
+    initParticles();
+    initUI();
+    initShortcuts();
+    initSim();
+
+    window.addEventListener('resize', onResize);
+    if (typeof ResizeObserver !== 'undefined') new ResizeObserver(onResize).observe(viewportEl);
+    applyResize();
+
+    setText('rt-three', 'r' + THREE.REVISION);
+    setText('rt-dpr', renderer.getPixelRatio().toFixed(2));
+
+    requestAnimationFrame(animate);
+    document.getElementById('boot').classList.add('hidden');
+  } catch (err) {
+    fatal(String(err && err.message ? err.message : err));
+    throw err;
+  }
+});
+</script>
+</body>
+</html>
