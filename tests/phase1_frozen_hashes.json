@@ -1,18 +1,18 @@
 {
   "hashes": {
-    "src/evtyre/schema/__init__.py": "f21699c642b46ab7a620825e56e0f73024dea1acbc8be76fd0d0f39098a134e0",
-    "src/evtyre/schema/common.py": "7ef2d0272e0e065968cdf18fb223e42913168611195a5101f3e71e37e9e403fc",
-    "src/evtyre/schema/telemetry.py": "151d64c5dc4af5376152d988d874d9e71591e2c6dab5e2eeba7b03af461be4fa",
-    "src/evtyre/config/__init__.py": "b802c8553faa8ade94dd0126040d502c654a7575d625a9b1ba00412245d57455",
-    "src/evtyre/config/tyre.py": "44231ca793809541368c3e7ca2573f0022ad620067b6b1d918bf5e0997531318",
-    "src/evtyre/config/vehicle.py": "d1dce746cb0e41ab3cb1414362594d6e97eef0e745eb75b48904b4e0334473a1",
-    "src/evtyre/ingest/__init__.py": "55af8f2a7fb71ef826c9504953891c31b8ad528af5b674acc91ce5eceb6b2470",
-    "src/evtyre/ingest/interface.py": "2a329a1a704277457cb77550abfc3aa8152f6f81e932d1d92c8497e5ff6bd034",
-    "src/evtyre/ingest/normalize.py": "5632e1a2d73ef2e9f588b3ddd94ad7b6a4571a4fd3766fbeede223643fb1a8fa",
-    "src/evtyre/ingest/raw.py": "c073bf437bdb033fb63a22f0c64a48cdfde713b047314d19965624eb7fd8c800",
-    "src/evtyre/ingest/units.py": "459e6e31f11fdc521162659eff0c8602d870a7e91b7b02f9bda025970e1d6d54",
-    "src/evtyre/ingest/validation.py": "fda836f5cb30351b06f5e8682addcd2b82d666295a34c77a452784a4bea57c50",
-    "legacy/ev_tyre_fusion.py": "950ef9d160632d806ad578a90068abfa73835929a52ae43929344b758b23331b"
+    "src/evtyre/schema/__init__.py": "2e71e6ae9b970da8290121f3ccebf8e29daea95d7a1f08630cb68983cc400f5e",
+    "src/evtyre/schema/common.py": "20e4fc67f5e9616e99ca6292ff38a1bea555b5306fb69ca89c08c16b7f273e02",
+    "src/evtyre/schema/telemetry.py": "f2cda312cc1ab4f6b32508378e2bbe0909b3ba77c4b89dd38356ee2629ae6496",
+    "src/evtyre/config/__init__.py": "dce7f28b3357f9be24d9146f732c2542c0169fce1a95b6199cf501a173e96958",
+    "src/evtyre/config/tyre.py": "9f3a466897ad2055518fd73b8c5b7901f49f2f61cacbfe53510fee4141b423d2",
+    "src/evtyre/config/vehicle.py": "1720480f74e35dbeba6244161fdb7801c838c386bb9bd53e0e017b57c1aec032",
+    "src/evtyre/ingest/__init__.py": "4a9b440c67c9453e0ebea855c40711ca07f2d77545d21a9b187fab7e70bf23e9",
+    "src/evtyre/ingest/interface.py": "017b74c2ecb776da11365d39d22bab26328de0059d4ac5a4ebad765a9ed97ded",
+    "src/evtyre/ingest/normalize.py": "b8fb774166678322a9603df85852986539835d0c2708a624a372f24bebe4b457",
+    "src/evtyre/ingest/raw.py": "f0e7c9f663c3de8b778f49ffedd32510d875493198dc1cfed86ff2779fd8f03a",
+    "src/evtyre/ingest/units.py": "9206ead539479908131b535af76d4037224080e4a49825c9316a381dc27f9acf",
+    "src/evtyre/ingest/validation.py": "ed9b256bea0a79707229a5215547689a724fd185b731a18f995070d2a5fa50e1",
+    "legacy/ev_tyre_fusion.py": "ca9b40b4a4990b04cf21085aec79433a87ef8965a106304d45ce2af907708b06"
   },
   "directories": {
     "src/evtyre/schema": [

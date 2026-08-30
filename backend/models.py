@@ -159,3 +159,61 @@ class VehicleInfoResponse(BaseModel):
     placard_pressure_kPa: float = 240.0
     tread_new_mm: float = 8.0
     tread_legal_mm: float = 1.6
+
+
+# ---------------------------------------------------------------------------
+# Digital Twin (Phase 6)
+# ---------------------------------------------------------------------------
+
+class DigitalTwinRequest(BaseModel):
+    """Run a full digital twin simulation with the Phase 6 mock adapter."""
+    scenario: str = Field(
+        "normal",
+        description="Scenario type: normal, asymmetric, low_pressure, toe_misalign, accelerated, sensor_missing",
+    )
+    n_steps: int = Field(100, ge=10, le=500, description="Number of simulation steps")
+    dt_s: float = Field(360.0, gt=0, description="Time step in seconds (default 6 min)")
+
+
+class TyreFrame(BaseModel):
+    """One tyre's state at a point in time."""
+    tread_mm: float
+    tread_sigma: float
+    pressure_kpa: float
+    pressure_sigma: float
+    observability: str
+    vr: float
+    wear_pct: float = Field(0.0, description="Tread wear as percentage of usable range (0=new, 100=legal limit)")
+    wear_mm: float = Field(0.0, description="Tread wear in mm from new (8.0mm)")
+    wear_status: str = Field("new", description="Wear status: new, good, moderate, worn, critical")
+
+
+class GroundTruthFrame(BaseModel):
+    """Ground truth for one tyre."""
+    tread_mm: float
+    pressure_kpa: float
+    wear_pct: float = 0.0
+    wear_mm: float = 0.0
+
+
+class SimulationFrame(BaseModel):
+    """One time-step from the digital twin."""
+    step: int
+    timestamp_s: float
+    odometer_km: float
+    vehicle_speed_ms: float
+    treads: dict[str, float]
+    presses: dict[str, float]
+    estimates: dict[str, TyreFrame]
+    ground_truth: dict[str, GroundTruthFrame]
+    toe_sq: float
+    toe_observability: str
+    converged: bool
+    n_measurements: int
+
+
+class DigitalTwinResponse(BaseModel):
+    """Full digital twin simulation result."""
+    scenario: str
+    frames: list[SimulationFrame]
+    total_distance_km: float

@@ -38,13 +38,18 @@ from .estimator import (
     prior,
 )
 from .models import (
+    DigitalTwinRequest,
+    DigitalTwinResponse,
     EstimateResponse,
+    GroundTruthFrame,
     HealthResponse,
     Phase4Diagnostics,
+    SimulationFrame,
     SimulationRequest,
     SimulationResponse,
     StateEntry,
     TelemetryRequest,
+    TyreFrame,
     VehicleInfoResponse,
 )
 from .physics import (
@@ -73,6 +78,26 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ---------------------------------------------------------------------------
+# Static frontend
+# ---------------------------------------------------------------------------
+
+from fastapi.responses import FileResponse
+from pathlib import Path
+
+_frontend_dir = Path(__file__).resolve().parent.parent / "frontend"
+
+@app.get("/", response_class=FileResponse)
+def serve_dashboard():
+    """Serve the digital twin dashboard."""
+    return _frontend_dir / "digital_twin.html"
+
+@app.get("/dashboard", response_class=FileResponse)
+def serve_dashboard_alias():
+    """Alias for the dashboard."""
+    return _frontend_dir / "digital_twin.html"
 
 
 # ---------------------------------------------------------------------------
@@ -322,3 +347,164 @@ def estimator_status():
             "motortorque_sigma": SensorNoise.motortorque_sigma,
         },
     }
+
+
+# ---------------------------------------------------------------------------
+# Phase 6: Digital Twin Simulation
+# ---------------------------------------------------------------------------
+
+@app.post("/api/digital-twin/run", response_model=DigitalTwinResponse)
+def run_digital_twin(data: DigitalTwinRequest):
+    """Run a full digital twin simulation using the Phase 6 mock adapter.
+
+    The mock adapter generates physically-consistent telemetry from a hidden
+    ground-truth tyre state. The estimator receives only the observable
+    telemetry; ground truth is returned for validation.
+    """
+    import sys
+    import os
+    src_dir = os.path.join(os.path.dirname(__file__), '..', 'src')
+    if src_dir not in sys.path:
+        sys.path.insert(0, src_dir)
+    from evtyre.simulation.mock_adapter import MockVehicleAdapter
+    from evtyre.simulation.scenarios import ScenarioType, load_scenario
+    from .estimator import first_mode_frequency, effective_rolling_radius, rolling_resistance_coeff, toe_drag_from_sq
+
+    # Map string to ScenarioType
+    scenario_map = {
+        "normal": ScenarioType.NORMAL,
+        "asymmetric": ScenarioType.ASYMMETRIC_WEAR,
+        "low_pressure": ScenarioType.LOW_PRESSURE,
+        "toe_misalign": ScenarioType.TOE_MISALIGNMENT,
+        "accelerated": ScenarioType.ACCELERATED_DEGRADATION,
+        "sensor_missing": ScenarioType.SENSOR_MISSINGNESS,
+        "uniform_wear": ScenarioType.UNIFORM_WEAR,
+        "pressure_drift": ScenarioType.PRESSURE_DRIFT,
+    }
+    scenario_type = scenario_map.get(data.scenario, ScenarioType.NORMAL)
+    scenario = load_scenario(scenario_type)
+
+    adapter = MockVehicleAdapter()
+    adapter.reset(scenario)
+
+    frames = []
+    for step in range(data.n_steps):
+        state = adapter.step(data.dt_s)
+        gt = state.ground_truth
+
+        # Build measurement vector matching the estimator's expected layout:
+        # z[0:4]   = TPMS pressure
+        # z[4:8]   = resonance frequency (Hz)
+        # z[8:10]  = wheel-speed ratios (rear/front per axle)
+        # z[10]    = road-load Crr equivalent
+        # z[11]    = motor torque (N.m)
+        z = np.zeros(N_MEAS)
+        v_ms = state.vehicle_speed_ms
+
+        # 1) TPMS pressure — directly from mock adapter
+        for i, c in enumerate(CORNERS):
+            sr = state.telemetry.tpms_pressure_kpa.get(c)
+            z[i] = sr.value if sr and sr.value is not None else 0.0
+
+        # 2) Resonance frequency — computed from ground truth tread + pressure
+        #    (the mock adapter doesn't expose this, but a real TPMS would measure it)
+        for i, c in enumerate(CORNERS):
+            tread = gt.tread_mm[c]
+            press = gt.pressure_kpa[c]
+            z[4 + i] = first_mode_frequency(tread, press)
+
+        # 3) Wheel-speed ratios — from wheel_speed_rad_s
+        ws = {}
+        for c in CORNERS:
+            sr = state.telemetry.wheel_speed_rad_s.get(c)
+            ws[c] = sr.value if sr and sr.value is not None else 0.0
+        for k, (a, b) in enumerate((("FL", "FR"), ("RL", "RR"))):
+            if ws[a] > 0 and ws[b] > 0:
+                z[8 + k] = ws[b] / ws[a]
+            else:
+                z[8 + k] = 1.0
+
+        # 4) Road-load Crr equivalent — from ground truth tyre state
+        crr_vals = [rolling_resistance_coeff(gt.tread_mm[c], gt.pressure_kpa[c], 30.0) for c in CORNERS]
+        avg_crr = np.mean(crr_vals)
+        F_toe = toe_drag_from_sq(gt.toe_sq_deg2)
+        z[M_ROADLOAD] = avg_crr + F_toe / (Vehicle.mass * Vehicle.g)
+
+        # 5) Motor torque — from mock adapter
+        if state.motor_torque_nm is not None:
+            z[M_MOTORTORQUE] = state.motor_torque_nm
+        else:
+            z[M_MOTORTORQUE] = np.nan
+
+        # Temperature
+        T_meas = state.telemetry.tpms_temperature_c.get("FL")
+        T_val = T_meas.value if T_meas and T_meas.value is not None else 25.0
+
+        # Run the actual backend estimator
+        x, P = estimate(z, T_val, iters=6, v_ms=v_ms, accel_ms2=0.0)
+        sigma = np.sqrt(np.diag(P))
+        _, P0 = prior()
+        s0 = np.sqrt(np.diag(P0))
+
+        # Build estimate entries per tyre
+        estimates = {}
+        for j, name in enumerate(STATE_NAMES):
+            shrink = s0[j] / sigma[j] if sigma[j] > 1e-15 else float("inf")
+            obs = "NO_INFORMATION" if shrink < 1.05 else "OBSERVED"
+            if j < 4:
+                tread_est = float(x[j])
+                wear_mm = Vehicle.tread_new - tread_est
+                wear_pct = (wear_mm / (Vehicle.tread_new - Vehicle.tread_legal)) * 100.0
+                wear_pct = max(0.0, min(100.0, wear_pct))
+                if wear_pct < 20: status = "new"
+                elif wear_pct < 50: status = "good"
+                elif wear_pct < 75: status = "moderate"
+                elif wear_pct < 90: status = "worn"
+                else: status = "critical"
+                estimates[CORNERS[j]] = TyreFrame(
+                    tread_mm=tread_est,
+                    tread_sigma=float(sigma[j]),
+                    pressure_kpa=float(x[4 + j]),
+                    pressure_sigma=float(sigma[4 + j]),
+                    observability=obs,
+                    vr=float(shrink),
+                    wear_pct=round(wear_pct, 1),
+                    wear_mm=round(wear_mm, 2),
+                    wear_status=status,
+                )
+
+        # Toe observability
+        toe_shrink = s0[8] / sigma[8] if sigma[8] > 1e-15 else float("inf")
+        toe_obs = "NO_INFORMATION" if toe_shrink < 1.05 else "OBSERVED"
+
+        # Ground truth with wear
+        gt_wear = {}
+        for c in CORNERS:
+            gt_wear[c] = GroundTruthFrame(
+                tread_mm=float(gt.tread_mm[c]),
+                pressure_kpa=float(gt.pressure_kpa[c]),
+                wear_pct=round(((Vehicle.tread_new - gt.tread_mm[c]) / (Vehicle.tread_new - Vehicle.tread_legal)) * 100.0, 1),
+                wear_mm=round(Vehicle.tread_new - gt.tread_mm[c], 2),
+            )
+
+        frame = SimulationFrame(
+            step=step,
+            timestamp_s=state.timestamp_s,
+            odometer_km=state.odometer_km,
+            vehicle_speed_ms=state.vehicle_speed_ms,
+            treads={c: float(gt.tread_mm[c]) for c in CORNERS},
+            presses={c: float(gt.pressure_kpa[c]) for c in CORNERS},
+            estimates=estimates,
+            ground_truth=gt_wear,
+            toe_sq=float(gt.toe_sq_deg2),
+            toe_observability=toe_obs,
+            converged=bool(np.max(np.abs(x - prior()[0])) < 100),
+            n_measurements=int(np.sum(~np.isnan(z[:4])) + (z[8] != 1.0) + (z[9] != 1.0) + 1),
+        )
+        frames.append(frame)
+
+    return DigitalTwinResponse(
+        scenario=data.scenario,
+        frames=frames,
+        total_distance_km=frames[-1].odometer_km if frames else 0.0,
+    )
