@@ -754,14 +754,9 @@ function buildEnvironmentMap() {
 function buildRoad() {
   roadGroup = new THREE.Group();
 
-  const asphalt = new THREE.Mesh(
-    new THREE.PlaneGeometry(ROAD_W, ROAD_SPAN),
-    new THREE.MeshStandardMaterial({ color: C.asphalt, roughness: 0.8, metalness: 0.0 })
-  );
-  asphalt.rotation.x = -Math.PI / 2;
-  asphalt.position.set(ROAD_MID, 0.001, 0);
-  roadSurface = asphalt;
-  roadGroup.add(asphalt);
+  // No asphalt slab: the markings, poles and speed bump sit directly on the
+  // dark reflective ground. roadSurface stays null and its curvature update is
+  // already guarded.
 
   // dashed centre line — individual boxes on a 4 m period, recycled each frame
   const dashGeo = new THREE.BoxGeometry(0.16, 0.012, 2.0);
