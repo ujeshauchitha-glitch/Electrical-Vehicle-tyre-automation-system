@@ -203,6 +203,26 @@ input[type=range]::-moz-range-thumb {
 
 #cam-cluster { position:absolute; top:12px; left:50%; transform:translateX(-50%); display:flex; gap:5px; }
 
+#tour {
+  position:absolute; left:50%; bottom:52px; transform:translateX(-50%);
+  width:min(560px, calc(100% - 40px)); padding:12px 14px;
+  background:rgba(12,14,18,0.93);
+  backdrop-filter:blur(20px) saturate(115%); -webkit-backdrop-filter:blur(20px) saturate(115%);
+  border:1px solid var(--border-hi); border-radius:var(--r-md);
+  box-shadow:0 12px 40px rgba(0,0,0,0.55);
+  display:none; z-index:30;
+}
+#tour.show { display:block; animation:fadeUp 0.3s ease; }
+.tour-head { display:flex; align-items:center; gap:9px; margin-bottom:6px; }
+.tour-step {
+  font-family:var(--font-m); font-size:9.5px; letter-spacing:1px; color:var(--accent);
+  border:1px solid rgba(111,168,212,0.3); border-radius:4px; padding:1px 6px;
+}
+.tour-title { font-size:13px; font-weight:600; color:var(--txt); flex:1; }
+.tour-body { font-size:11.5px; line-height:1.65; color:var(--txt-dim); }
+.tour-nav { display:flex; justify-content:flex-end; gap:6px; margin-top:9px; }
+.icon-btn[disabled] { opacity:0.35; pointer-events:none; }
+
 #hud {
   position:absolute; bottom:12px; left:50%; transform:translateX(-50%);
   display:flex; gap:16px; padding:6px 14px;
@@ -368,9 +388,11 @@ table.dt tr:hover td { background:rgba(255,255,255,0.018); }
       <div class="ctrl-group">
         <span class="ctrl-label">Package</span>
         <div style="display:flex;gap:3px;">
-          <button class="icon-btn active" data-pkg="base" style="width:auto;padding:0 9px;font-size:10px;font-family:var(--font-m);" title="Base sensor package">BASE</button>
-          <button class="icon-btn" data-pkg="extended" style="width:auto;padding:0 9px;font-size:10px;font-family:var(--font-m);" title="Extended: + road load, + lateral accel (P)">EXT</button>
+          <button class="icon-btn active" data-pkg="base" style="width:auto;padding:0 8px;font-size:10px;font-family:var(--font-m);" title="Wheel speed + TPMS + temperature">BASE</button>
+          <button class="icon-btn" data-pkg="esc" style="width:auto;padding:0 8px;font-size:10px;font-family:var(--font-m);" title="+ lateral accelerometer and steering angle - mandatory ESC hardware (P)">ESC</button>
+          <button class="icon-btn" data-pkg="full" style="width:auto;padding:0 8px;font-size:10px;font-family:var(--font-m);" title="+ motor-torque road load and windowed wheel-speed ratio (P)">FULL</button>
         </div>
+        <button class="icon-btn" id="tour-btn" style="width:auto;padding:0 10px;font-size:10px;font-family:var(--font-m);" title="Guided tour (T)">TOUR</button>
         <button class="play-btn" id="play-btn" title="Play / pause (Space)">❚❚</button>
         <button class="icon-btn" id="reset-btn" title="Reset scenario (R)">⟲</button>
       </div>
@@ -393,6 +415,15 @@ table.dt tr:hover td { background:rgba(255,255,255,0.018); }
     <span class="ctrl-label">Camber (true)</span>
     <input type="range" id="camber-slider" min="-4" max="4" step="0.1" value="0" style="width:82px;">
     <span class="ctrl-val" id="camber-val" style="min-width:44px;">0.00°</span>
+
+    <span style="width:1px;height:16px;background:var(--border);"></span>
+
+    <span class="ctrl-label">Steer</span>
+    <input type="range" id="steer-slider" min="-8" max="8" step="0.25" value="0" style="width:82px;">
+    <span class="ctrl-val" id="steer-val" style="min-width:80px;">0.0° · 0.00 g</span>
+    <label class="ctrl-label" style="cursor:pointer;display:flex;align-items:center;gap:4px;">
+      <input type="checkbox" id="steer-auto" checked style="accent-color:var(--accent);width:11px;height:11px;">S-curve
+    </label>
   </div>
 
   <!-- ====================== MAIN ====================== -->
@@ -447,6 +478,8 @@ table.dt tr:hover td { background:rgba(255,255,255,0.018); }
           <div class="sub" id="rul-RR" style="color:var(--txt-mut);">—</div>
           <div style="margin-top:4px;display:none;" id="obswrap-RR"><span class="badge badge-warn" id="obs-RR">WEAK</span><span class="sub" id="tsig-RR" style="margin:0 0 0 6px;">—</span></div>
         </div>
+
+        <div id="tour"></div>
 
         <div id="hud">
           <span class="mut" title="The 3D vehicle renders the SIMULATED GROUND TRUTH. The cards and panels show the estimator's output.">3D = TRUTH</span>
@@ -620,7 +653,7 @@ let viewportEl, canvasEl;
 /* Phase 2 scene handles, consumed by Phase 3/4 */
 let carGroup, bodyGroup;
 let tyres = [], tyreSpins = [], tyreGlows = [], tyreMats = [];
-let roadGroup, dashes = [], bumpMesh, bumpZ = ROAD_HALF;
+let roadGroup, dashes = [], bumpMesh, bumpZ = ROAD_HALF, roadSurface = null, edgeLines = [];
 let scrollers = [];        // everything that translates in -Z with the vehicle
 
 function fatal(msg) {
@@ -727,6 +760,7 @@ function buildRoad() {
   );
   asphalt.rotation.x = -Math.PI / 2;
   asphalt.position.set(ROAD_MID, 0.001, 0);
+  roadSurface = asphalt;
   roadGroup.add(asphalt);
 
   // dashed centre line — individual boxes on a 4 m period, recycled each frame
@@ -748,6 +782,7 @@ function buildRoad() {
   [EDGE_L_X, EDGE_R_X].forEach(x => {
     const e = new THREE.Mesh(edgeGeo, edgeMat);
     e.position.set(x, 0.012, 0);
+    edgeLines.push(e);
     roadGroup.add(e);
   });
 
@@ -777,6 +812,7 @@ function buildRoad() {
       const lamp = new THREE.Mesh(lampGeo, lampMat);
       lamp.position.set(-side * 0.85, 4.08, 0); p.add(lamp);
       p.position.set(x, 0, -ROAD_HALF + i * POLE_GAP);
+      p.userData.baseX = x;
       scrollers.push(p);
       roadGroup.add(p);
     }
@@ -1043,7 +1079,7 @@ const ESTIMATOR_HZ = 10;   // the estimator runs on snapshots, not every frame
 
 /* ---------------------- state and measurement layout --------------------- */
 const N_STATE = 10;
-const N_MEAS  = 12;
+const N_MEAS  = 13;
 const STATE_NAMES = ['tread_FL','tread_FR','tread_RL','tread_RR',
                      'press_FL','press_FR','press_RL','press_RR',
                      'toe_sq','camber'];
@@ -1051,7 +1087,7 @@ const STATE_UNITS = ['mm','mm','mm','mm','kPa','kPa','kPa','kPa','deg²','deg'];
 const MEAS_NAMES = ['TPMS FL','TPMS FR','TPMS RL','TPMS RR',
                     'Resonance FL','Resonance FR','Resonance RL','Resonance RR',
                     'Front axle radius ratio','Rear axle radius ratio',
-                    'Road load force','Lateral acceleration'];
+                    'Road load force','Lateral acceleration','Steering offset'];
 const BLOCKED = 1e12;
 const VR_OBSERVED_THRESHOLD = 0.01;
 const JACOBIAN_NORM_EPS = 1e-10;
@@ -1059,7 +1095,7 @@ const JACOBIAN_NORM_EPS = 1e-10;
 /* Optional channels. Both default OFF, matching what the vehicle is currently
    claimed to measure. Turning one on is a hypothesis about a sensor the system
    does not yet have — the UI labels them as such. */
-const channels = { roadLoad: false, lateral: false };
+const channels = { roadLoad: false, lateral: false, steering: false };
 
 /* ---------------------------- physics ------------------------------------ */
 function effectiveRadius(tread_mm, p_kpa, fz_n) {
@@ -1073,7 +1109,42 @@ function cornerWeight(idx) {                       // 0=FL 1=FR 2=RL 3=RR
   const share = idx < 2 ? VEHICLE.front_weight_fraction : 1 - VEHICLE.front_weight_fraction;
   return VEHICLE.mass_kg * G * share / 2;
 }
-const FZ = [cornerWeight(0), cornerWeight(1), cornerWeight(2), cornerWeight(3)];
+const FZ_STATIC = [cornerWeight(0), cornerWeight(1), cornerWeight(2), cornerWeight(3)];
+const FZ = FZ_STATIC.slice();
+
+/* Lateral load transfer. Cornering swings the corner weights hard — at
+   4 m/s^2 the front pair goes from 4263/4263 N to 3176/5350 N — and r_eff
+   depends on F_z, so a corner is an independent probe of the SAME tread and
+   pressure states under a different load. That is information a straight line
+   cannot provide.
+
+   a_y is computed from the steering angle and speed, both measured inputs, so
+   the estimator recomputes these weights exactly as the simulator does. No
+   ground truth crosses over. */
+const TRACK_M = 1.6;
+function updateCornerWeights(ay) {
+  const dW = VEHICLE.mass_kg * ay * VEHICLE.cg_height_m / TRACK_M;
+  const dF = dW * VEHICLE.front_weight_fraction;
+  const dR = dW * (1 - VEHICLE.front_weight_fraction);
+  FZ[0] = Math.max(200, FZ_STATIC[0] - dF);
+  FZ[1] = Math.max(200, FZ_STATIC[1] + dF);
+  FZ[2] = Math.max(200, FZ_STATIC[2] - dR);
+  FZ[3] = Math.max(200, FZ_STATIC[3] + dR);
+}
+
+/* Steering-angle offset needed to hold a straight line.
+
+   Camber thrust is a lateral force, so a cambered axle makes the car pull and
+   the driver holds a compensating steer angle. Balancing 4*C_gamma*gamma
+   against the front axle's 2*C_alpha*alpha gives
+
+       offset = -2 * (C_gamma / C_alpha) * gamma
+
+   This is how an alignment shop diagnoses a pull, and it needs only a steering
+   angle sensor — standard on every electric-power-steering car. */
+function steeringOffsetDeg(camber_deg) {
+  return -2 * (PHYS.camber_stiffness / PHYS.cornering_stiffness) * camber_deg;
+}
 
 function rollingResistance(tread_mm, p_kpa, t_c) {
   const p_term = Math.pow(TYRECFG.placard_kpa / Math.max(p_kpa, 1), PHYS.p_exponent);
@@ -1121,6 +1192,7 @@ function predict(x, temps) {
   z[9]  = radiusRatio(x[3], x[7], 3, x[2], x[6], 2);
   z[10] = roadLoadForce(x, temps);
   z[11] = camberLateralAccel(x[9]);
+  z[12] = steeringOffsetDeg(x[9]);
   return z;
 }
 
@@ -1196,12 +1268,22 @@ const ROADLOAD_REF_N = (function () {
   return roadLoadForce(x, [30, 30, 30, 30]);
 })();
 
+/* Wheel-speed ratio noise. 0.005 is the legacy per-sample figure. Averaging
+   the ratio over a window of revolutions drives it down roughly as 1/sqrt(N),
+   and 1e-4 is reachable over a few seconds of steady driving. This assumption
+   is the single biggest lever on whether absolute tread is recoverable at all,
+   so it is a control rather than a buried constant. */
+const RATIO_SIGMA = { perSample: 5e-3, windowed: 1e-4 };
+const noiseModel = { ratioSigma: RATIO_SIGMA.perSample };
+
 function measurementVar(missingSensor) {
   const R = new Float64Array(N_MEAS).fill(BLOCKED);
   for (let i = 0; i < 4; i++) R[i] = 25.0;                 // TPMS  5 kPa 1-sigma
-  R[8] = 2.5e-5; R[9] = 2.5e-5;                            // ratio 0.005 1-sigma
+  const rs = noiseModel.ratioSigma * noiseModel.ratioSigma;
+  R[8] = rs; R[9] = rs;
   if (channels.roadLoad) R[10] = Math.pow(0.05 * ROADLOAD_REF_N, 2);
   if (channels.lateral)  R[11] = 4e-4;                     // 0.02 m/s^2 1-sigma
+  if (channels.steering) R[12] = 2.5e-3;                   // 0.05 deg 1-sigma
   if (missingSensor >= 0 && missingSensor < 4) R[missingSensor] = BLOCKED;
   return R;
 }
@@ -1454,6 +1536,10 @@ const sim = {
   suspDisp: 0,
   suspVel: 0,
   pitch: 0,
+  steer: 0,          // road-wheel steer angle, degrees
+  steerAuto: true,   // sweep an S-curve so the load probe runs on its own
+  lateralAccel: 0,   // m/s^2, from steer + speed
+  curvature: 0,      // 1/R
   prevSpeed: 20,
   estResult: null,
   converged: false,
@@ -1517,6 +1603,7 @@ function buildMeasurement() {
   z[9]  += uniformNoise(1e-4);
   z[10] += uniformNoise(0.02 * ROADLOAD_REF_N);                // road load +/- 2 %
   z[11] += uniformNoise(0.01);                                 // lateral +/- 0.01 m/s^2
+  z[12] += uniformNoise(0.03);                                 // steering +/- 0.03 deg
   return z;
 }
 
@@ -1529,9 +1616,27 @@ function trueState() {
 }
 
 /* ------------------------------ simulation ------------------------------- */
+/* Bicycle model: curvature = tan(steer)/wheelbase, a_y = v^2 / R.
+   Kept modest — 6 m/s^2 is brisk cornering, not a track day. */
+const MAX_LATERAL_ACCEL = 6.0;
+const STEER_AMPLITUDE = 6.0;      // degrees
+const STEER_PERIOD_S = 11.0;
+
+function updateSteering(dt) {
+  if (sim.steerAuto) {
+    sim.steer = STEER_AMPLITUDE * Math.sin(2 * Math.PI * sim.timestamp / STEER_PERIOD_S);
+  }
+  const rad = sim.steer * Math.PI / 180;
+  sim.curvature = Math.tan(rad) / VEHICLE.wheelbase_m;
+  const ay = sim.curvature * sim.speed * sim.speed;
+  sim.lateralAccel = Math.max(-MAX_LATERAL_ACCEL, Math.min(MAX_LATERAL_ACCEL, ay));
+  updateCornerWeights(sim.lateralAccel);
+}
+
 function simStep(dt) {
   if (sim.paused) return;
   const sc = SCENARIOS[sim.scenarioIdx];
+  updateSteering(dt);
 
   const dtSim = dt * TIME_SCALE;
   const distStepKm = sim.speed * dtSim / 1000;
@@ -1579,6 +1684,7 @@ function runEstimator() {
    requiring the sim to be replayed. */
 function seekToDistance(km) {
   const sc = SCENARIOS[sim.scenarioIdx];
+  updateSteering(0);
   sim.distKm = km;
   for (let i = 0; i < 4; i++) {
     sim.treads[i] = Math.max(0.5, sc.treads[i] - sc.wearRates[i] * WEAR_ACCEL * km / 1000);
@@ -1606,6 +1712,10 @@ function initSim() {
   sim.suspDisp = 0;
   sim.suspVel = 0;
   sim.pitch = 0;
+  sim.steer = 0;
+  sim.lateralAccel = 0;
+  sim.curvature = 0;
+  updateCornerWeights(0);
   sim.estResult = null;
   sim.estAccum = 0;
   sim.history.length = 0;
@@ -1751,6 +1861,9 @@ function updateUI(force) {
 
   setText('dist-val', sim.distKm.toFixed(1) + ' km');
   setVal('dist-slider', Math.min(1000, sim.distKm));
+  setText('steer-val', sim.steer.toFixed(1) + '\u00b0 \u00b7 ' +
+          (sim.lateralAccel / 9.80665).toFixed(2) + ' g');
+  if (sim.steerAuto) setVal('steer-slider', sim.steer.toFixed(2));
 
   renderEstimatorTable(r);
   renderObservability(r);
@@ -1767,7 +1880,7 @@ function renderEstimatorTable(r) {
   let h = '<table class="dt"><thead><tr>' +
     '<th>State</th><th style="text-align:right">Estimate</th><th style="text-align:right">σ</th>' +
     '<th style="text-align:right">Truth</th><th style="text-align:right">Error</th>' +
-    '<th style="text-align:right">Var.red.</th><th>Observability</th></tr></thead><tbody>';
+    '<th style="text-align:right">Var.red.</th></tr></thead><tbody>';
   for (let j = 0; j < N_STATE; j++) {
     const s = r.states[j];
     const err = s.value - xt[j];
@@ -1780,8 +1893,7 @@ function renderEstimatorTable(r) {
       '<td class="sig">' + xt[j].toFixed(dp) + '</td>' +
       '<td class="num" style="color:' + (Math.abs(err) < Math.max(s.sigma, 1e-9) ? 'var(--ok)' : 'var(--warn)') + '">' +
         (err >= 0 ? '+' : '') + err.toFixed(dp) + '</td>' +
-      '<td class="sig">' + s.vr.toFixed(4) + '</td>' +
-      '<td><span class="badge ' + OBS_CLASS[s.obs] + '">' + s.obs + '</span></td></tr>';
+      '<td class="sig">' + s.vr.toFixed(4) + '</td></tr>';
   }
   h += '</tbody></table>';
   h += '<div class="note note-warn">Truth and Error columns exist because this is a SIMULATION. ' +
@@ -1867,6 +1979,17 @@ function initUI() {
   document.querySelectorAll('[data-pkg]').forEach(b =>
     b.addEventListener('click', () => setPackage(b.dataset.pkg)));
 
+  document.getElementById('steer-slider').addEventListener('input', e => {
+    sim.steerAuto = false;
+    document.getElementById('steer-auto').checked = false;
+    sim.steer = +e.target.value;
+    updateSteering(0); runEstimator(); updateUI(true);
+  });
+  document.getElementById('steer-auto').addEventListener('change', e => {
+    sim.steerAuto = e.target.checked;
+  });
+  document.getElementById('tour-btn').addEventListener('click', toggleTour);
+
   /* A real deployment knows what tread the tyre was fitted with, so the
      informative prior is the honest default. It changes the NUMBER only:
      the observability labels are identical either way. */
@@ -1897,8 +2020,10 @@ function renderSensors() {
   for (let i = 0; i < 4; i++) rows.push(['Wheel speed ' + CORNERS[i], true, '']);
   for (let i = 0; i < 4; i++) rows.push(['TPMS ' + CORNERS[i], sc.missingSensor !== i, '']);
   rows.push(['Tyre temperature', true, '']);
-  rows.push(['Motor torque road load', channels.roadLoad, 'optional']);
-  rows.push(['Lateral accelerometer', channels.lateral, 'optional']);
+  rows.push(['Lateral accelerometer', channels.lateral, 'ESC standard']);
+  rows.push(['Steering angle', channels.steering, 'ESC standard']);
+  rows.push(['Motor torque road load', channels.roadLoad, 'proposed']);
+  rows.push(['Windowed ratio', noiseModel.ratioSigma < 1e-3, 'signal proc.']);
   const list = document.getElementById('sensor-list');
   if (!list) return;
   list.innerHTML = rows.map(([n, on, tag]) =>
@@ -2055,19 +2180,26 @@ const ACCURACY_DATA = {"gen":"2026-08-30T11:00:13+00:00","src":"tests/test_estim
 /* One control instead of two checkboxes: a demo needs to flip the whole
    configuration in a single click and see what the extra hardware buys. */
 const PACKAGES = {
-  base:     { roadLoad: false, lateral: false,
-              label: 'Base (production)',
-              note: 'Wheel speed + TPMS + temperature only. Absolute tread, toe and camber are not identifiable from this set.' },
-  extended: { roadLoad: true,  lateral: true,
-              label: 'Extended (+torque, +lateral)',
-              note: 'Adds a motor-torque road-load estimate and a lateral accelerometer. Both are PROPOSED channels, not fitted hardware.' }
+  base: { roadLoad: false, lateral: false, steering: false, ratio: 'perSample',
+          label: 'BASE',
+          note: 'Wheel speed + TPMS + temperature. Absolute tread, toe and camber are all unidentifiable from this set.' },
+  esc:  { roadLoad: false, lateral: true,  steering: true,  ratio: 'perSample',
+          label: 'ESC',
+          note: 'Adds the lateral accelerometer and steering-angle sensor. These are NOT hypothetical: electronic stability control has been mandatory on new passenger cars since FMVSS 126 (US, MY2012) and EU Reg. 661/2009 (Nov 2014), and ESC needs exactly these sensors. Camber becomes observable, sign included, with no new hardware.' },
+  full: { roadLoad: true,  lateral: true,  steering: true,  ratio: 'windowed',
+          label: 'FULL',
+          note: 'Adds a motor-torque road-load estimate, and assumes the wheel-speed ratio is averaged over a window (sigma 1e-4 rather than the legacy 5e-3 per-sample figure). Toe becomes observable, and cornering load transfer starts to constrain absolute tread.' }
 };
 let activePackage = 'base';
 
 function setPackage(name) {
   activePackage = name;
-  channels.roadLoad = PACKAGES[name].roadLoad;
-  channels.lateral  = PACKAGES[name].lateral;
+  const pk = PACKAGES[name];
+  channels.roadLoad = pk.roadLoad;
+  channels.lateral  = pk.lateral;
+  channels.steering = pk.steering;
+  noiseModel.ratioSigma = RATIO_SIGMA[pk.ratio];
+  capabilityCache = null; accuracyRendered = false;
   const rl = document.getElementById('ch-roadload');
   const la = document.getElementById('ch-lateral');
   if (rl) rl.checked = channels.roadLoad;
@@ -2371,12 +2503,15 @@ function computeCapability() {
 
 function capabilitySweep() {
   const keep = { idx: sim.scenarioIdx, rl: channels.roadLoad, la: channels.lateral,
+                 st: channels.steering, rs: noiseModel.ratioSigma,
                  fit: priorMode.fitment, paused: sim.paused };
   const acc = { absTread: [], diffTread: [], press: [], toe: [], camber: [] };
 
-  for (const pkg of ['base', 'extended']) {
+  for (const pkg of Object.keys(PACKAGES)) {
     channels.roadLoad = PACKAGES[pkg].roadLoad;
     channels.lateral  = PACKAGES[pkg].lateral;
+    channels.steering = PACKAGES[pkg].steering;
+    noiseModel.ratioSigma = RATIO_SIGMA[PACKAGES[pkg].ratio];
     for (let s = 0; s < SCENARIOS.length; s++) {
       sim.scenarioIdx = s; initSim(); sim.paused = true; runEstimator();
       const r = sim.estResult, xt = trueState();
@@ -2393,14 +2528,15 @@ function capabilitySweep() {
   const worst = a => a.length ? Math.max(...a) : NaN;
 
   sim.scenarioIdx = keep.idx; channels.roadLoad = keep.rl; channels.lateral = keep.la;
+  channels.steering = keep.st; noiseModel.ratioSigma = keep.rs;
   priorMode.fitment = keep.fit; initSim(); sim.paused = keep.paused; runEstimator();
 
   capabilityCache = [
     { q: 'Tyre pressure, per corner',      mean: mean(acc.press),     worst: worst(acc.press),     unit: 'kPa',  verdict: 'MEASURED',      pkg: 'base', why: 'TPMS measures it directly. Variance reduction 0.985.' },
     { q: 'Tread difference, within axle',  mean: mean(acc.diffTread), worst: worst(acc.diffTread), unit: 'mm',   verdict: 'MEASURED',      pkg: 'base', why: 'The axle speed ratio responds to the difference in rolling radius.' },
-    { q: 'Camber angle (incl. sign)',      mean: mean(acc.camber),    worst: worst(acc.camber),    unit: '°',    verdict: 'MEASURED',      pkg: 'ext',  why: 'Camber thrust appears in lateral acceleration. Needs the proposed accelerometer.' },
-    { q: 'Toe angle (magnitude only)',     mean: mean(acc.toe),       worst: worst(acc.toe),       unit: '°',    verdict: 'MEASURED',      pkg: 'ext',  why: 'Toe drag appears in road load. Sign is not recoverable — drag is even in toe.' },
-    { q: 'Absolute tread depth',           mean: mean(acc.absTread),  worst: worst(acc.absTread),  unit: 'mm',   verdict: 'NOT RECOVERABLE', pkg: '—',  why: 'No channel resolves the common mode. Road load gives dF/dtread ≈ 1 N/mm against ~8 N noise — SNR below 1. Needs a direct tread sensor.' }
+    { q: 'Camber angle (incl. sign)',      mean: mean(acc.camber),    worst: worst(acc.camber),    unit: '°',    verdict: 'MEASURED',      pkg: 'ESC',  why: 'A cambered axle makes the car pull; the steering offset and lateral accelerometer both see it. Mandatory ESC hardware — no new sensor.' },
+    { q: 'Toe angle (magnitude only)',     mean: mean(acc.toe),       worst: worst(acc.toe),       unit: '°',    verdict: 'MEASURED',      pkg: 'FULL', why: 'Toe drag appears in road load. Sign is not recoverable — drag is even in toe.' },
+    { q: 'Absolute tread depth',           mean: mean(acc.absTread),  worst: worst(acc.absTread),  unit: 'mm',   verdict: 'NOT RECOVERABLE', pkg: '—',  why: 'Road load gives dF/dtread ≈ 1 N/mm against ~8 N noise. Cornering load transfer was tested and adds nothing measurable (common-mode reduction 0.0489 while cornering vs 0.0492 straight). Needs a direct tread sensor.' }
   ];
   return capabilityCache;
 }
@@ -2425,8 +2561,8 @@ function renderAccuracy() {
       '<td class="num" style="color:' + (ok ? 'var(--ok)' : 'var(--bad)') + '">' +
         (isNaN(c.mean) ? '—' : (c.mean < 0.1 ? c.mean.toFixed(3) : c.mean.toFixed(2)) + ' ' + c.unit) + '</td>' +
       '<td class="sig">' + (isNaN(c.worst) ? '—' : c.worst.toFixed(2) + ' ' + c.unit) + '</td>' +
-      '<td class="sig">' + (c.pkg === 'ext' ? '<span class="badge badge-accent">EXT</span>'
-                          : c.pkg === 'base' ? '<span class="badge badge-mut">base</span>' : '—') + '</td>' +
+      '<td class="sig">' + (c.pkg === '—' ? '—'
+                          : '<span class="badge ' + (c.pkg === 'base' ? 'badge-mut' : 'badge-accent') + '">' + c.pkg + '</span>') + '</td>' +
       '<td><span class="badge ' + (ok ? 'badge-ok' : 'badge-bad') + '">' + c.verdict + '</span></td>' +
       '<td class="mut" style="font-size:9.5px;">' + c.why + '</td></tr>';
   }
@@ -2580,12 +2716,20 @@ function initShortcuts() {
     const k = e.key;
     if (k === ' ') { e.preventDefault(); sim.paused = !sim.paused; setPlayIcon(); return; }
     if (k === 'r' || k === 'R') { initSim(); return; }
+    if (k === 't' || k === 'T') { toggleTour(); return; }
+    if (k === 'Escape') { endTour(); return; }
+    if (tourStep >= 0 && k === 'ArrowRight') { gotoTour(tourStep + 1); return; }
+    if (tourStep >= 0 && k === 'ArrowLeft')  { gotoTour(tourStep - 1); return; }
     if (k === 'c' || k === 'C') {
       const front = document.getElementById('cam-front');
       (front.classList.contains('active') ? document.getElementById('cam-orbit') : front).click();
       return;
     }
-    if (k === 'p' || k === 'P') { setPackage(activePackage === 'base' ? 'extended' : 'base'); return; }
+    if (k === 'p' || k === 'P') {
+      const order = ['base', 'esc', 'full'];
+      setPackage(order[(order.indexOf(activePackage) + 1) % order.length]);
+      return;
+    }
     if (/^[0-9]$/.test(k)) {
       const idx = k === '0' ? 9 : (+k - 1);
       if (idx < SCENARIOS.length) { sim.scenarioIdx = idx; initSim(); }
@@ -2630,6 +2774,101 @@ function startFallbackDashboard() {
   };
   tick();
 }
+
+/* ==========================================================================
+   Guided tour
+   --------------------------------------------------------------------------
+   Drives the demo through the argument in order: what is measured, what is
+   not, and what hardware would change that. Each step sets the scenario,
+   sensor package and tab itself, so the demo can run while you talk.
+   ========================================================================== */
+const TOUR = [
+  { title: 'A tyre you cannot see',
+    body: 'The 3D vehicle is the SIMULATED TRUTH — what the tyres are really doing. Every card and table shows only what the estimator INFERRED from telemetry. The gap between them is the whole problem.',
+    run: () => { sim.scenarioIdx = 0; initSim(); setPackage('base'); showTab('estimator'); } },
+
+  { title: 'Pressure is easy',
+    body: 'TPMS measures pressure directly, so the estimator recovers all four corners to about 0.3 kPa. Variance reduction 0.985 — the measurement, not the prior, is doing the work. This is what a solved state looks like.',
+    run: () => { sim.scenarioIdx = 4; initSim(); showTab('estimator'); } },
+
+  { title: 'Tread is not',
+    body: 'Rear tyres here are genuinely worn to 5.0 and 4.0 mm. Watch the Error column: the estimator gets the DIFFERENCE between them almost exactly, and the absolute level badly wrong. It is not broken — it is being honest.',
+    run: () => { sim.scenarioIdx = 2; initSim(); showTab('estimator'); } },
+
+  { title: 'Why: the ratio only sees differences',
+    body: 'Tread reaches the estimator through one channel — the left/right wheel-speed ratio. That responds to the DIFFERENCE in rolling radius across an axle and is blind to both wheels wearing together. The common-mode test detects this and refuses to call tread OBSERVED.',
+    run: () => { showTab('observability'); } },
+
+  { title: 'Alignment is invisible too',
+    body: 'This vehicle has a real -1.5 degree camber fault. On the base sensor set the estimate sits at exactly 0.000 with variance reduction 0.0000 — that number IS the prior, handed back. Zero Jacobian sensitivity: nothing on the car can see it.',
+    run: () => { sim.scenarioIdx = 7; initSim(); setPackage('base'); showTab('estimator'); } },
+
+  { title: 'One click of hardware you already have',
+    body: 'Switch to ESC. Camber lands within about 0.05 degrees of the true -1.50, sign included. No new hardware: stability control has been mandatory since 2012 in the US and 2014 in the EU, and it requires exactly the lateral accelerometer and steering-angle sensor this uses. A cambered axle makes the car pull, and the steering offset gives it away.',
+    run: () => { setPackage('esc'); showTab('estimator'); } },
+
+  { title: 'Toe needs one more channel',
+    body: 'FULL adds a road-load estimate from motor torque. Toe drag is even in toe, so the magnitude is recoverable but the sign never is. Absolute tread improves a little too, from about 1.45 to 1.21 mm — real, but nowhere near enough to quote a tread depth.',
+    run: () => { sim.scenarioIdx = 5; initSim(); setPackage('full'); showTab('estimator'); } },
+
+  { title: 'Why alignment is the point',
+    body: 'Misalignment does not just sit there — it CAUSES wear. Toe is the largest single cause of rapid uneven wear, camber wears one shoulder. Catching a 1 degree toe error is worth more than measuring the tread it is about to destroy, because it is the one you can still act on.',
+    run: () => { sim.scenarioIdx = 5; initSim(); setPackage('full'); showTab('wear'); } },
+
+  { title: 'What it can and cannot do',
+    body: 'Swept live over all ten scenarios and both packages. Four quantities are genuinely resolved. Absolute tread depth is not, under any prior, package or solver setting — that is an observability result, and it tells you precisely which sensor would fix it.',
+    run: () => { showTab('accuracy'); } }
+];
+
+let tourStep = -1;
+
+function showTab(name) {
+  const b = document.querySelector('[data-tab="' + name + '"]');
+  if (b) b.click();
+}
+
+function renderTour() {
+  const el = document.getElementById('tour');
+  if (!el) return;
+  if (tourStep < 0 || tourStep >= TOUR.length) { el.classList.remove('show'); return; }
+  const t = TOUR[tourStep];
+  el.classList.add('show');
+  el.innerHTML =
+    '<div class="tour-head"><span class="tour-step">' + (tourStep + 1) + ' / ' + TOUR.length +
+      '</span><span class="tour-title">' + t.title + '</span>' +
+      '<button class="icon-btn" id="tour-x" title="Exit tour (Esc)">✕</button></div>' +
+    '<div class="tour-body">' + t.body + '</div>' +
+    '<div class="tour-nav">' +
+      '<button class="icon-btn" id="tour-prev" style="width:auto;padding:0 10px;font-size:10px;font-family:var(--font-m);"' +
+        (tourStep === 0 ? ' disabled' : '') + '>← BACK</button>' +
+      '<button class="icon-btn active" id="tour-next" style="width:auto;padding:0 10px;font-size:10px;font-family:var(--font-m);">' +
+        (tourStep === TOUR.length - 1 ? 'FINISH' : 'NEXT →') + '</button>' +
+    '</div>';
+  document.getElementById('tour-x').onclick = () => endTour();
+  document.getElementById('tour-prev').onclick = () => gotoTour(tourStep - 1);
+  document.getElementById('tour-next').onclick = () =>
+    tourStep === TOUR.length - 1 ? endTour() : gotoTour(tourStep + 1);
+}
+
+function gotoTour(i) {
+  if (i < 0 || i >= TOUR.length) return;
+  tourStep = i;
+  try { TOUR[i].run(); } catch (e) { console.error('[tour]', e); }
+  updateUI(true);
+  renderTour();
+  const btn = document.getElementById('tour-btn');
+  if (btn) btn.classList.add('active');
+}
+
+function endTour() {
+  tourStep = -1;
+  renderTour();
+  const btn = document.getElementById('tour-btn');
+  if (btn) btn.classList.remove('active');
+}
+
+function toggleTour() { tourStep < 0 ? gotoTour(0) : endTour(); }
+
 /* ---------- resize: rAF-debounced, ResizeObserver-driven ----------------- */
 let resizeQueued = false, lastW = 0, lastH = 0;
 function applyResize() {
@@ -2678,14 +2917,31 @@ function animate(time) {
   const rot = (sim.speed / TYRE_R) * dt;
   if (!sim.paused) for (let i = 0; i < 4; i++) tyreSpins[i].rotation.x += rot;
 
+  /* Bend the road to match the commanded curvature: x = base + k*z^2/2 is the
+     second-order approximation of a constant-radius arc, which is what the
+     bicycle model above is driving. */
+  const k = sim.curvature;
   for (let i = 0; i < dashes.length; i++) {
-    dashes[i].position.z -= travel;
-    if (dashes[i].position.z < -ROAD_HALF) dashes[i].position.z += ROAD_SPAN;
+    const d = dashes[i];
+    d.position.z -= travel;
+    if (d.position.z < -ROAD_HALF) d.position.z += ROAD_SPAN;
+    d.position.x = CENTRE_X + 0.5 * k * d.position.z * d.position.z;
   }
   for (let i = 0; i < scrollers.length; i++) {
-    scrollers[i].position.z -= travel;
-    if (scrollers[i].position.z < -ROAD_HALF) scrollers[i].position.z += ROAD_SPAN;
+    const p = scrollers[i];
+    p.position.z -= travel;
+    if (p.position.z < -ROAD_HALF) p.position.z += ROAD_SPAN;
+    p.position.x = p.userData.baseX + 0.5 * k * p.position.z * p.position.z;
   }
+  if (roadSurface) roadSurface.rotation.y = -Math.atan(k * 12);
+  if (edgeLines) edgeLines.forEach(e => { e.rotation.y = -Math.atan(k * 12); });
+
+  // vehicle attitude: yaw into the corner, body rolls outward
+  carGroup.rotation.y = -Math.atan(sim.curvature * 6);
+  bodyGroup.rotation.z = sim.lateralAccel * 0.012;
+  // front wheels take the steer angle on top of toe
+  const steerRad = sim.steer * Math.PI / 180;
+  tyres[0].rotation.y += steerRad; tyres[1].rotation.y += steerRad;
 
   const prevBumpZ = bumpZ;
   bumpZ -= travel;
