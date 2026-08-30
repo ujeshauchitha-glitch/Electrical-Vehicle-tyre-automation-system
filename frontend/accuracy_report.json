@@ -1,0 +1,795 @@
+{
+ "generated_utc": "2026-08-30T11:00:13+00:00",
+ "source": "tests/test_estimation_accuracy.py (441-test suite)",
+ "prior_tread_mm": 4.8,
+ "prior_tread_sigma_mm": 2.5,
+ "tread_new_mm": 8.0,
+ "tread_legal_mm": 1.6,
+ "n_steps": 20,
+ "scenarios": [
+  {
+   "name": "normal",
+   "tread_mae": 0.2,
+   "press_mae": 0.6406,
+   "coverage_2sigma": 1.0,
+   "tread_error_sd_max": 0.0,
+   "tread_offset_fraction_min": 1.0,
+   "implied_gt_tread_mm": {
+    "FL": 5.0,
+    "FR": 5.0,
+    "RL": 5.0,
+    "RR": 5.0
+   },
+   "tread_per_corner": {
+    "FL": {
+     "mae": 0.2,
+     "rmse": 0.2,
+     "bias": -0.2,
+     "max": 0.2,
+     "error_sd": 0.0,
+     "offset_fraction": 1.0,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "FR": {
+     "mae": 0.2,
+     "rmse": 0.2,
+     "bias": -0.2,
+     "max": 0.2,
+     "error_sd": 0.0,
+     "offset_fraction": 1.0,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "RL": {
+     "mae": 0.2,
+     "rmse": 0.2,
+     "bias": -0.2,
+     "max": 0.2,
+     "error_sd": 0.0,
+     "offset_fraction": 1.0,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "RR": {
+     "mae": 0.2,
+     "rmse": 0.2,
+     "bias": -0.2,
+     "max": 0.2,
+     "error_sd": 0.0,
+     "offset_fraction": 1.0,
+     "coverage": 1.0,
+     "n": 20
+    }
+   },
+   "press_per_corner": {
+    "FL": {
+     "mae": 0.6406,
+     "rmse": 0.7103,
+     "bias": -0.1748,
+     "max": 0.9827,
+     "error_sd": 0.6885,
+     "offset_fraction": 0.2728,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "FR": {
+     "mae": 0.6406,
+     "rmse": 0.7103,
+     "bias": -0.1748,
+     "max": 0.9827,
+     "error_sd": 0.6885,
+     "offset_fraction": 0.2728,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "RL": {
+     "mae": 0.6406,
+     "rmse": 0.7103,
+     "bias": -0.1748,
+     "max": 0.9827,
+     "error_sd": 0.6885,
+     "offset_fraction": 0.2728,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "RR": {
+     "mae": 0.6406,
+     "rmse": 0.7103,
+     "bias": -0.1748,
+     "max": 0.9827,
+     "error_sd": 0.6885,
+     "offset_fraction": 0.2728,
+     "coverage": 1.0,
+     "n": 20
+    }
+   }
+  },
+  {
+   "name": "uniform_wear",
+   "tread_mae": 0.3,
+   "press_mae": 0.6406,
+   "coverage_2sigma": 1.0,
+   "tread_error_sd_max": 0.0,
+   "tread_offset_fraction_min": 1.0,
+   "implied_gt_tread_mm": {
+    "FL": 4.5,
+    "FR": 4.5,
+    "RL": 4.5,
+    "RR": 4.5
+   },
+   "tread_per_corner": {
+    "FL": {
+     "mae": 0.3,
+     "rmse": 0.3,
+     "bias": 0.3,
+     "max": 0.3,
+     "error_sd": 0.0,
+     "offset_fraction": 1.0,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "FR": {
+     "mae": 0.3,
+     "rmse": 0.3,
+     "bias": 0.3,
+     "max": 0.3,
+     "error_sd": 0.0,
+     "offset_fraction": 1.0,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "RL": {
+     "mae": 0.3,
+     "rmse": 0.3,
+     "bias": 0.3,
+     "max": 0.3,
+     "error_sd": 0.0,
+     "offset_fraction": 1.0,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "RR": {
+     "mae": 0.3,
+     "rmse": 0.3,
+     "bias": 0.3,
+     "max": 0.3,
+     "error_sd": 0.0,
+     "offset_fraction": 1.0,
+     "coverage": 1.0,
+     "n": 20
+    }
+   },
+   "press_per_corner": {
+    "FL": {
+     "mae": 0.6406,
+     "rmse": 0.7103,
+     "bias": -0.1748,
+     "max": 0.9827,
+     "error_sd": 0.6885,
+     "offset_fraction": 0.2728,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "FR": {
+     "mae": 0.6406,
+     "rmse": 0.7103,
+     "bias": -0.1748,
+     "max": 0.9827,
+     "error_sd": 0.6885,
+     "offset_fraction": 0.2728,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "RL": {
+     "mae": 0.6406,
+     "rmse": 0.7103,
+     "bias": -0.1748,
+     "max": 0.9827,
+     "error_sd": 0.6885,
+     "offset_fraction": 0.2728,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "RR": {
+     "mae": 0.6406,
+     "rmse": 0.7103,
+     "bias": -0.1748,
+     "max": 0.9827,
+     "error_sd": 0.6885,
+     "offset_fraction": 0.2728,
+     "coverage": 1.0,
+     "n": 20
+    }
+   }
+  },
+  {
+   "name": "asymmetric_wear",
+   "tread_mae": 0.3498,
+   "press_mae": 0.6406,
+   "coverage_2sigma": 1.0,
+   "tread_error_sd_max": 3e-05,
+   "tread_offset_fraction_min": 1.0,
+   "implied_gt_tread_mm": {
+    "FL": 4.8,
+    "FR": 4.8,
+    "RL": 4.169,
+    "RR": 4.032
+   },
+   "tread_per_corner": {
+    "FL": {
+     "mae": 0.0,
+     "rmse": 0.0,
+     "bias": 0.0,
+     "max": 0.0,
+     "error_sd": 0.0,
+     "offset_fraction": 1.0,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "FR": {
+     "mae": 0.0,
+     "rmse": 0.0,
+     "bias": 0.0,
+     "max": 0.0,
+     "error_sd": 0.0,
+     "offset_fraction": 1.0,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "RL": {
+     "mae": 0.6313,
+     "rmse": 0.6313,
+     "bias": 0.6313,
+     "max": 0.6314,
+     "error_sd": 3e-05,
+     "offset_fraction": 1.0,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "RR": {
+     "mae": 0.768,
+     "rmse": 0.768,
+     "bias": 0.768,
+     "max": 0.768,
+     "error_sd": 3e-05,
+     "offset_fraction": 1.0,
+     "coverage": 1.0,
+     "n": 20
+    }
+   },
+   "press_per_corner": {
+    "FL": {
+     "mae": 0.6406,
+     "rmse": 0.7103,
+     "bias": -0.1748,
+     "max": 0.9827,
+     "error_sd": 0.6885,
+     "offset_fraction": 0.2728,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "FR": {
+     "mae": 0.6406,
+     "rmse": 0.7103,
+     "bias": -0.1748,
+     "max": 0.9827,
+     "error_sd": 0.6885,
+     "offset_fraction": 0.2728,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "RL": {
+     "mae": 0.6285,
+     "rmse": 0.7014,
+     "bias": -0.1351,
+     "max": 1.022,
+     "error_sd": 0.68828,
+     "offset_fraction": 0.215,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "RR": {
+     "mae": 0.6527,
+     "rmse": 0.7214,
+     "bias": -0.2145,
+     "max": 1.0181,
+     "error_sd": 0.68873,
+     "offset_fraction": 0.3287,
+     "coverage": 1.0,
+     "n": 20
+    }
+   }
+  },
+  {
+   "name": "low_pressure",
+   "tread_mae": 0.2,
+   "press_mae": 0.6705,
+   "coverage_2sigma": 1.0,
+   "tread_error_sd_max": 0.00666,
+   "tread_offset_fraction_min": 1.0,
+   "implied_gt_tread_mm": {
+    "FL": 5.0,
+    "FR": 5.0,
+    "RL": 4.982,
+    "RR": 5.018
+   },
+   "tread_per_corner": {
+    "FL": {
+     "mae": 0.2,
+     "rmse": 0.2,
+     "bias": -0.2,
+     "max": 0.2,
+     "error_sd": 0.0,
+     "offset_fraction": 1.0,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "FR": {
+     "mae": 0.2,
+     "rmse": 0.2,
+     "bias": -0.2,
+     "max": 0.2,
+     "error_sd": 0.0,
+     "offset_fraction": 1.0,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "RL": {
+     "mae": 0.1819,
+     "rmse": 0.182,
+     "bias": -0.1819,
+     "max": 0.1896,
+     "error_sd": 0.00661,
+     "offset_fraction": 1.0,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "RR": {
+     "mae": 0.2182,
+     "rmse": 0.2183,
+     "bias": -0.2182,
+     "max": 0.2294,
+     "error_sd": 0.00666,
+     "offset_fraction": 1.0,
+     "coverage": 1.0,
+     "n": 20
+    }
+   },
+   "press_per_corner": {
+    "FL": {
+     "mae": 0.6406,
+     "rmse": 0.7103,
+     "bias": -0.1748,
+     "max": 0.9827,
+     "error_sd": 0.6885,
+     "offset_fraction": 0.2728,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "FR": {
+     "mae": 0.6406,
+     "rmse": 0.7103,
+     "bias": -0.1748,
+     "max": 0.9827,
+     "error_sd": 0.6885,
+     "offset_fraction": 0.2728,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "RL": {
+     "mae": 0.6406,
+     "rmse": 0.7106,
+     "bias": -0.1726,
+     "max": 0.9862,
+     "error_sd": 0.68928,
+     "offset_fraction": 0.2694,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "RR": {
+     "mae": 0.7602,
+     "rmse": 1.0131,
+     "bias": 0.7445,
+     "max": 1.8997,
+     "error_sd": 0.68713,
+     "offset_fraction": 0.9793,
+     "coverage": 1.0,
+     "n": 20
+    }
+   }
+  },
+  {
+   "name": "pressure_drift",
+   "tread_mae": 0.2,
+   "press_mae": 0.6077,
+   "coverage_2sigma": 1.0,
+   "tread_error_sd_max": 0.0,
+   "tread_offset_fraction_min": 1.0,
+   "implied_gt_tread_mm": {
+    "FL": 5.0,
+    "FR": 5.0,
+    "RL": 5.0,
+    "RR": 5.0
+   },
+   "tread_per_corner": {
+    "FL": {
+     "mae": 0.2,
+     "rmse": 0.2,
+     "bias": -0.2,
+     "max": 0.2,
+     "error_sd": 0.0,
+     "offset_fraction": 1.0,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "FR": {
+     "mae": 0.2,
+     "rmse": 0.2,
+     "bias": -0.2,
+     "max": 0.2,
+     "error_sd": 0.0,
+     "offset_fraction": 1.0,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "RL": {
+     "mae": 0.2,
+     "rmse": 0.2,
+     "bias": -0.2,
+     "max": 0.2,
+     "error_sd": 0.0,
+     "offset_fraction": 1.0,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "RR": {
+     "mae": 0.2,
+     "rmse": 0.2,
+     "bias": -0.2,
+     "max": 0.2,
+     "error_sd": 0.0,
+     "offset_fraction": 1.0,
+     "coverage": 1.0,
+     "n": 20
+    }
+   },
+   "press_per_corner": {
+    "FL": {
+     "mae": 0.6077,
+     "rmse": 0.6888,
+     "bias": -0.0209,
+     "max": 1.1366,
+     "error_sd": 0.6885,
+     "offset_fraction": 0.0344,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "FR": {
+     "mae": 0.6077,
+     "rmse": 0.6888,
+     "bias": -0.0209,
+     "max": 1.1366,
+     "error_sd": 0.6885,
+     "offset_fraction": 0.0344,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "RL": {
+     "mae": 0.6077,
+     "rmse": 0.6888,
+     "bias": -0.0209,
+     "max": 1.1366,
+     "error_sd": 0.6885,
+     "offset_fraction": 0.0344,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "RR": {
+     "mae": 0.6077,
+     "rmse": 0.6888,
+     "bias": -0.0209,
+     "max": 1.1366,
+     "error_sd": 0.6885,
+     "offset_fraction": 0.0344,
+     "coverage": 1.0,
+     "n": 20
+    }
+   }
+  },
+  {
+   "name": "toe_misalignment",
+   "tread_mae": 0.2,
+   "press_mae": 0.6406,
+   "coverage_2sigma": 1.0,
+   "tread_error_sd_max": 1e-05,
+   "tread_offset_fraction_min": 1.0,
+   "implied_gt_tread_mm": {
+    "FL": 5.0,
+    "FR": 5.0,
+    "RL": 5.0,
+    "RR": 5.0
+   },
+   "tread_per_corner": {
+    "FL": {
+     "mae": 0.2,
+     "rmse": 0.2,
+     "bias": -0.2,
+     "max": 0.2,
+     "error_sd": 1e-05,
+     "offset_fraction": 1.0,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "FR": {
+     "mae": 0.2,
+     "rmse": 0.2,
+     "bias": -0.2,
+     "max": 0.2,
+     "error_sd": 1e-05,
+     "offset_fraction": 1.0,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "RL": {
+     "mae": 0.2,
+     "rmse": 0.2,
+     "bias": -0.2,
+     "max": 0.2,
+     "error_sd": 0.0,
+     "offset_fraction": 1.0,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "RR": {
+     "mae": 0.2,
+     "rmse": 0.2,
+     "bias": -0.2,
+     "max": 0.2,
+     "error_sd": 0.0,
+     "offset_fraction": 1.0,
+     "coverage": 1.0,
+     "n": 20
+    }
+   },
+   "press_per_corner": {
+    "FL": {
+     "mae": 0.6406,
+     "rmse": 0.7103,
+     "bias": -0.1748,
+     "max": 0.9827,
+     "error_sd": 0.6885,
+     "offset_fraction": 0.2728,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "FR": {
+     "mae": 0.6406,
+     "rmse": 0.7103,
+     "bias": -0.1748,
+     "max": 0.9827,
+     "error_sd": 0.6885,
+     "offset_fraction": 0.2728,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "RL": {
+     "mae": 0.6406,
+     "rmse": 0.7103,
+     "bias": -0.1748,
+     "max": 0.9827,
+     "error_sd": 0.6885,
+     "offset_fraction": 0.2728,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "RR": {
+     "mae": 0.6406,
+     "rmse": 0.7103,
+     "bias": -0.1748,
+     "max": 0.9827,
+     "error_sd": 0.6885,
+     "offset_fraction": 0.2728,
+     "coverage": 1.0,
+     "n": 20
+    }
+   }
+  },
+  {
+   "name": "sensor_missingness",
+   "tread_mae": 0.2,
+   "press_mae": 0.6406,
+   "coverage_2sigma": 1.0,
+   "tread_error_sd_max": 0.0,
+   "tread_offset_fraction_min": 1.0,
+   "implied_gt_tread_mm": {
+    "FL": 5.0,
+    "FR": 5.0,
+    "RL": 5.0,
+    "RR": 5.0
+   },
+   "tread_per_corner": {
+    "FL": {
+     "mae": 0.2,
+     "rmse": 0.2,
+     "bias": -0.2,
+     "max": 0.2,
+     "error_sd": 0.0,
+     "offset_fraction": 1.0,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "FR": {
+     "mae": 0.2,
+     "rmse": 0.2,
+     "bias": -0.2,
+     "max": 0.2,
+     "error_sd": 0.0,
+     "offset_fraction": 1.0,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "RL": {
+     "mae": 0.2,
+     "rmse": 0.2,
+     "bias": -0.2,
+     "max": 0.2,
+     "error_sd": 0.0,
+     "offset_fraction": 1.0,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "RR": {
+     "mae": 0.2,
+     "rmse": 0.2,
+     "bias": -0.2,
+     "max": 0.2,
+     "error_sd": 0.0,
+     "offset_fraction": 1.0,
+     "coverage": 1.0,
+     "n": 20
+    }
+   },
+   "press_per_corner": {
+    "FL": {
+     "mae": 0.6406,
+     "rmse": 0.7103,
+     "bias": -0.1748,
+     "max": 0.9827,
+     "error_sd": 0.6885,
+     "offset_fraction": 0.2728,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "FR": {
+     "mae": 0.6406,
+     "rmse": 0.7103,
+     "bias": -0.1748,
+     "max": 0.9827,
+     "error_sd": 0.6885,
+     "offset_fraction": 0.2728,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "RL": {
+     "mae": 0.6406,
+     "rmse": 0.7103,
+     "bias": -0.1748,
+     "max": 0.9827,
+     "error_sd": 0.6885,
+     "offset_fraction": 0.2728,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "RR": {
+     "mae": 0.6406,
+     "rmse": 0.7103,
+     "bias": -0.1748,
+     "max": 0.9827,
+     "error_sd": 0.6885,
+     "offset_fraction": 0.2728,
+     "coverage": 1.0,
+     "n": 20
+    }
+   }
+  },
+  {
+   "name": "accelerated_degradation",
+   "tread_mae": 0.8,
+   "press_mae": 0.6406,
+   "coverage_2sigma": 1.0,
+   "tread_error_sd_max": 1e-05,
+   "tread_offset_fraction_min": 1.0,
+   "implied_gt_tread_mm": {
+    "FL": 4.0,
+    "FR": 4.0,
+    "RL": 4.0,
+    "RR": 4.0
+   },
+   "tread_per_corner": {
+    "FL": {
+     "mae": 0.8,
+     "rmse": 0.8,
+     "bias": 0.8,
+     "max": 0.8,
+     "error_sd": 1e-05,
+     "offset_fraction": 1.0,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "FR": {
+     "mae": 0.8,
+     "rmse": 0.8,
+     "bias": 0.8,
+     "max": 0.8,
+     "error_sd": 1e-05,
+     "offset_fraction": 1.0,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "RL": {
+     "mae": 0.8,
+     "rmse": 0.8,
+     "bias": 0.8,
+     "max": 0.8,
+     "error_sd": 1e-05,
+     "offset_fraction": 1.0,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "RR": {
+     "mae": 0.8,
+     "rmse": 0.8,
+     "bias": 0.8,
+     "max": 0.8,
+     "error_sd": 1e-05,
+     "offset_fraction": 1.0,
+     "coverage": 1.0,
+     "n": 20
+    }
+   },
+   "press_per_corner": {
+    "FL": {
+     "mae": 0.6406,
+     "rmse": 0.7103,
+     "bias": -0.1748,
+     "max": 0.9827,
+     "error_sd": 0.6885,
+     "offset_fraction": 0.2728,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "FR": {
+     "mae": 0.6406,
+     "rmse": 0.7103,
+     "bias": -0.1748,
+     "max": 0.9827,
+     "error_sd": 0.6885,
+     "offset_fraction": 0.2728,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "RL": {
+     "mae": 0.6406,
+     "rmse": 0.7103,
+     "bias": -0.1748,
+     "max": 0.9827,
+     "error_sd": 0.6885,
+     "offset_fraction": 0.2728,
+     "coverage": 1.0,
+     "n": 20
+    },
+    "RR": {
+     "mae": 0.6406,
+     "rmse": 0.7103,
+     "bias": -0.1748,
+     "max": 0.9827,
+     "error_sd": 0.6885,
+     "offset_fraction": 0.2728,
+     "coverage": 1.0,
+     "n": 20
+    }
+   }
+  }
+ ]
+}
