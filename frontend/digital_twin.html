@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EV Tyre Digital Twin — Phase 6</title>
+<style>
+  :root {
+    --bg: #0a0e17;
+    --card: #111827;
+    --card-hover: #1a2332;
+    --border: #1e293b;
+    --text: #e2e8f0;
+    --text-dim: #94a3b8;
+    --accent: #3b82f6;
+    --green: #22c55e;
+    --yellow: #eab308;
+    --red: #ef4444;
+    --purple: #a855f7;
+    --cyan: #06b6d4;
+    --orange: #f97316;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; min-height: 100vh; }
+  .container { max-width: 1400px; margin: 0 auto; padding: 1.5rem; }
+  .header { text-align: center; margin-bottom: 2rem; padding: 1.5rem; background: linear-gradient(135deg, #111827, #1e293b); border-radius: 16px; border: 1px solid var(--border); }
+  .header h1 { font-size: 2rem; font-weight: 700; background: linear-gradient(135deg, var(--accent), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .header .subtitle { color: var(--text-dim); font-size: 1rem; }
+  .badge { display: inline-block; margin-top: 0.5rem; padding: 0.25rem 0.75rem; background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.3); border-radius: 20px; font-size: 0.8rem; color: var(--accent); }
+  .section-title { font-size: 1.1rem; font-weight: 600; margin: 1.5rem 0 1rem; display: flex; align-items: center; gap: 0.5rem; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 1.5rem; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.25rem; margin-bottom: 1.5rem; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.25rem; margin-bottom: 1.5rem; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; transition: all 0.2s; }
+  .card:hover { border-color: var(--accent); box-shadow: 0 0 20px rgba(59,130,246,0.1); }
+  .card-title { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); margin-bottom: 0.5rem; }
+  .card-value { font-size: 1.8rem; font-weight: 700; }
+  .card-unit { font-size: 0.8rem; color: var(--text-dim); margin-left: 0.2rem; }
+
+  /* Scenario selector */
+  .scenario-panel { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem; }
+  .scenario-buttons { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
+  .scenario-btn { padding: 0.5rem 1rem; border-radius: 8px; border: 1px solid var(--border); background: var(--card-hover); color: var(--text); cursor: pointer; font-size: 0.8rem; transition: all 0.2s; }
+  .scenario-btn:hover { border-color: var(--accent); }
+  .scenario-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+
+  /* Replay controls */
+  .replay-bar { display: flex; align-items: center; gap: 1rem; padding: 1rem 1.25rem; background: var(--card); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 1.5rem; }
+  .replay-btn { padding: 0.5rem 1.5rem; border-radius: 8px; border: 1px solid var(--accent); background: transparent; color: var(--accent); cursor: pointer; font-weight: 600; transition: all 0.2s; }
+  .replay-btn:hover { background: var(--accent); color: white; }
+  .replay-btn.active { background: var(--accent); color: white; }
+  .replay-slider { flex: 1; accent-color: var(--accent); }
+  .replay-stat { font-size: 0.8rem; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+
+  /* EV top-down view */
+  .ev-view { position: relative; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; min-height: 500px; }
+  .ev-car { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 180px; height: 340px; }
+  .ev-car svg { width: 100%; height: 100%; opacity: 0.25; }
+  .tyre-card { position: absolute; width: 160px; background: var(--card-hover); border: 2px solid var(--border); border-radius: 10px; padding: 0.75rem; cursor: pointer; transition: all 0.3s; z-index: 10; }
+  .tyre-card:hover { transform: scale(1.05); box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+  .tyre-card.selected { border-color: var(--accent); box-shadow: 0 0 20px rgba(59,130,246,0.3); }
+  .tyre-card .corner-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-dim); }
+  .tyre-card .tread-val { font-size: 1.1rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .tyre-card .obs-badge { display: inline-block; padding: 0.1rem 0.4rem; border-radius: 8px; font-size: 0.6rem; font-weight: 600; text-transform: uppercase; margin-top: 0.25rem; }
+  .obs-OBSERVED { background: rgba(34,197,94,0.15); color: var(--green); border: 1px solid rgba(34,197,94,0.3); }
+  .obs-WEAK { background: rgba(234,179,8,0.15); color: var(--yellow); border: 1px solid rgba(234,179,8,0.3); }
+  .obs-UNOBSERVABLE { background: rgba(239,68,68,0.15); color: var(--red); border: 1px solid rgba(239,68,68,0.3); }
+
+  /* Tyre positions */
+  #tyre-fl { top: 15%; left: 5%; }
+  #tyre-fr { top: 15%; right: 5%; }
+  #tyre-rl { bottom: 15%; left: 5%; }
+  #tyre-rr { bottom: 15%; right: 5%; }
+
+  /* Detail panel */
+  .detail-panel { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem; display: none; }
+  .detail-panel.visible { display: block; }
+  .detail-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+  .detail-close { cursor: pointer; color: var(--text-dim); font-size: 1.2rem; }
+  .detail-close:hover { color: var(--text); }
+  .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .detail-stat { padding: 0.75rem; background: rgba(255,255,255,0.03); border-radius: 8px; }
+  .detail-stat .label { font-size: 0.75rem; color: var(--text-dim); }
+  .detail-stat .value { font-size: 1.2rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .detail-chain { margin-top: 1rem; padding: 1rem; background: rgba(59,130,246,0.05); border: 1px solid rgba(59,130,246,0.2); border-radius: 8px; }
+  .chain-step { display: flex; align-items: center; gap: 0.5rem; padding: 0.3rem 0; font-size: 0.85rem; }
+  .chain-step .arrow { color: var(--text-dim); }
+
+  /* Observability bars */
+  .obs-bar-row { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; }
+  .obs-bar-label { width: 120px; font-size: 0.8rem; color: var(--text-dim); }
+  .obs-bar-track { flex: 1; height: 20px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden; position: relative; }
+  .obs-bar-fill { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
+  .obs-bar-text { width: 100px; text-align: right; font-size: 0.75rem; font-weight: 600; }
+
+  /* Ground truth table */
+  .gt-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  .gt-table th { text-align: left; padding: 0.5rem; font-size: 0.75rem; text-transform: uppercase; color: var(--text-dim); border-bottom: 1px solid var(--border); }
+  .gt-table td { padding: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.85rem; }
+  .gt-table .simulated { color: var(--text-dim); font-style: italic; }
+
+  /* Degradation chart */
+  .chart-container { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem; }
+  canvas { width: 100%; height: 250px; }
+
+  /* Sensor panel */
+  .sensor-list { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+  .sensor-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.75rem; background: rgba(255,255,255,0.03); border-radius: 6px; font-size: 0.8rem; }
+  .sensor-icon { font-size: 1rem; }
+  .sensor-icon.available { color: var(--green); }
+  .sensor-icon.unavailable { color: var(--red); }
+
+  /* Asymmetry alert */
+  .alert { padding: 0.75rem 1rem; border-radius: 8px; margin-bottom: 1rem; font-size: 0.85rem; }
+  .alert-warning { background: rgba(234,179,8,0.1); border: 1px solid rgba(234,179,8,0.3); color: var(--yellow); }
+  .alert-danger { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: var(--red); }
+  .alert-info { background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.3); color: var(--accent); }
+
+  @media (max-width: 900px) {
+    .grid-4 { grid-template-columns: repeat(2, 1fr); }
+    .grid-3 { grid-template-columns: 1fr; }
+    .grid-2 { grid-template-columns: 1fr; }
+    .ev-view { min-height: 400px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <h1>&#9889; EV Tyre Digital Twin</h1>
+    <div class="subtitle">Phase 6 — Interactive Simulation &amp; Estimator Validation</div>
+    <div class="badge">SIMULATION MODE — Not real-world validation</div>
+  </div>
+
+  <!-- Scenario Selection -->
+  <div class="section-title">&#127922; Scenario</div>
+  <div class="scenario-panel">
+    <div style="font-size:0.85rem; color:var(--text-dim);">Select a hidden ground-truth scenario. The estimator never sees this — only the resulting telemetry.</div>
+    <div class="scenario-buttons" id="scenario-buttons"></div>
+  </div>
+
+  <!-- Replay Controls -->
+  <div class="section-title">&#9654;&#65039; Replay</div>
+  <div class="replay-bar">
+    <button class="replay-btn" id="btn-play" onclick="toggleReplay()">&#9654; Play</button>
+    <button class="replay-btn" onclick="resetReplay()">&#9632; Reset</button>
+    <input type="range" class="replay-slider" id="replay-slider" min="0" max="100" value="0" oninput="seekReplay(this.value)">
+    <div class="replay-stat" id="replay-distance">0.0 km</div>
+    <div class="replay-stat" id="replay-speed">15.0 m/s</div>
+  </div>
+
+  <!-- Alerts -->
+  <div id="alerts"></div>
+
+  <!-- Main Grid: EV View + Observability -->
+  <div class="grid-2">
+    <!-- EV Top-Down View -->
+    <div class="ev-view" id="ev-view">
+      <div class="ev-car">
+        <svg viewBox="0 0 200 400" fill="none" stroke="#3b82f6" stroke-width="1.5">
+          <rect x="50" y="40" width="100" height="320" rx="30"/>
+          <rect x="30" y="100" width="140" height="180" rx="15"/>
+          <circle cx="45" cy="90" r="18"/>
+          <circle cx="155" cy="90" r="18"/>
+          <circle cx="45" cy="310" r="18"/>
+          <circle cx="155" cy="310" r="18"/>
+          <line x1="60" y1="160" x2="140" y2="160" stroke-dasharray="4 4"/>
+          <line x1="60" y1="240" x2="140" y2="240" stroke-dasharray="4 4"/>
+        </svg>
+      </div>
+      <div class="tyre-card" id="tyre-fl" onclick="selectTyre('FL')"></div>
+      <div class="tyre-card" id="tyre-fr" onclick="selectTyre('FR')"></div>
+      <div class="tyre-card" id="tyre-rl" onclick="selectTyre('RL')"></div>
+      <div class="tyre-card" id="tyre-rr" onclick="selectTyre('RR')"></div>
+    </div>
+
+    <!-- Observability Panel -->
+    <div>
+      <div class="card" style="margin-bottom:1.25rem;">
+        <div class="card-title">Observability Index</div>
+        <div id="obs-bars"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Estimator Summary</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+          <div><div class="card-title">States Observed</div><div class="card-value" id="states-obs" style="color:var(--green);">—</div></div>
+          <div><div class="card-title">Measurements</div><div class="card-value" id="n-meas" style="color:var(--cyan);">—</div></div>
+          <div><div class="card-title">Converged</div><div class="card-value" id="converged" style="color:var(--purple);">—</div></div>
+          <div><div class="card-title">Iterations</div><div class="card-value" id="iterations" style="color:var(--accent);">—</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detail Panel (shown when tyre selected) -->
+  <div class="detail-panel" id="detail-panel">
+    <div class="detail-header">
+      <h3 id="detail-title">— Tyre Detail</h3>
+      <span class="detail-close" onclick="closeDetail()">&times;</span>
+    </div>
+    <div class="detail-grid" id="detail-grid"></div>
+    <div class="detail-chain" id="detail-chain"></div>
+  </div>
+
+  <!-- Ground Truth vs Estimate -->
+  <div class="section-title">&#128269; Ground Truth vs Estimate <span style="font-size:0.7rem; color:var(--yellow); margin-left:0.5rem;">SIMULATION ONLY</span></div>
+  <div class="card" style="margin-bottom:1.5rem;">
+    <table class="gt-table" id="gt-table">
+      <thead><tr>
+        <th>Corner</th>
+        <th>GT Tread (mm)</th>
+        <th>Est Tread</th>
+        <th>GT Pressure (kPa)</th>
+        <th>Est Pressure</th>
+        <th>Error Tread</th>
+      </tr></thead>
+      <tbody id="gt-tbody"><tr><td colspan="6" style="text-align:center;color:var(--text-dim);">Run simulation to populate</td></tr></tbody>
+    </table>
+  </div>
+
+  <!-- Degradation Chart -->
+  <div class="section-title">&#128200; Degradation Trajectory</div>
+  <div class="chart-container">
+    <canvas id="degradation-chart"></canvas>
+  </div>
+
+  <!-- Sensor Availability -->
+  <div class="section-title">&#128225; Sensor Availability</div>
+  <div class="card" style="margin-bottom:1.5rem;">
+    <div class="sensor-list" id="sensor-list"></div>
+  </div>
+
+  <!-- Footer -->
+  <div style="text-align:center;padding:1.5rem;color:var(--text-dim);font-size:0.8rem;border-top:1px solid var(--border);margin-top:1.5rem;">
+    EV Tyre Digital Twin — Phase 6 — CARLA/Mock Simulation<br>
+    This is a <strong>simulation</strong>, not real-world validation. Ground truth is synthetic.
+  </div>
+
+</div>
+
+<script>
+// ============================================================
+// DIGITAL TWIN ENGINE (JavaScript)
+// ============================================================
+
+const CORNERS = ['FL', 'FR', 'RL', 'RR'];
+const CORNER_NAMES = { FL: 'Front Left', FR: 'Front Right', RL: 'Rear Left', RR: 'Rear Right' };
+const OBS_COLORS = { OBSERVED: '#22c55e', WEAK: '#eab308', UNOBSERVABLE: '#ef4444' };
+
+// Physics constants (matches Python)
+const PHYSICS = { k_z0: 210000, cornering_stiffness: 55000, tread_rr_span: 0.20, c_rr0: 0.0090, p_exponent: 0.45, t_coeff: 0.0015, deflection_factor: 1/3 };
+const VEHICLE = { mass_kg: 1800, front_weight_fraction: 0.48, wheel_belt_radius_m: 0.322, tread_new_mm: 8.0, tread_legal_mm: 1.6, placard_pressure_kpa: 240, cold_reference_temperature_c: 25.0 };
+const G = 9.80665;
+const STATE_NAMES = ['tread_FL','tread_FR','tread_RL','tread_RR','press_FL','press_FR','press_RL','press_RR','toe^2','camber'];
+const MEAS_NAMES = ['press_FL','press_FR','press_RL','press_RR','freq_FL','freq_FR','freq_RL','freq_RR','ratio_front','ratio_rear','roadload'];
+
+// Scenarios
+const SCENARIOS = {
+  normal: { name: 'Normal', tread: [5,5,5,5], press: [240,240,240,240], toe: 0, wear: [0.03,0.03,0.04,0.05] },
+  asymmetric: { name: 'Asymmetric Wear', tread: [4.8,4.8,4.5,3.7], press: [240,240,240,240], toe: 0, wear: [0.02,0.02,0.03,0.08] },
+  low_pressure: { name: 'Low Pressure', tread: [5,5,5,5], press: [240,240,240,180], toe: 0, wear: [0.03,0.03,0.04,0.05] },
+  toe_misalign: { name: 'Toe Misalignment', tread: [5,5,5,5], press: [240,240,240,240], toe: 1.0, wear: [0.06,0.06,0.03,0.03] },
+  accelerated: { name: 'Accelerated', tread: [4,4,4,4], press: [240,240,240,240], toe: 0, wear: [0.10,0.10,0.12,0.12] },
+  sensor_missing: { name: 'Sensor Missing', tread: [5,5,5,5], press: [240,240,240,240], toe: 0, wear: [0.03,0.03,0.04,0.05], missing: ['motor_torque'] },
+};
+
+// State
+let currentScenario = 'normal';
+let replayData = [];
+let replayIndex = 0;
+let replayPlaying = false;
+let replayTimer = null;
+let selectedTyre = null;
+let degradationHistory = [];
+
+// ---- Physics Functions ----
+function cornerWeight(corner) {
+  const share = (corner==='FL'||corner==='FR') ? VEHICLE.front_weight_fraction : 1-VEHICLE.front_weight_fraction;
+  return VEHICLE.mass_kg * G * share / 2;
+}
+function effectiveRollingRadius(tread, press, fz) {
+  const rf = VEHICLE.wheel_belt_radius_m + tread/1000;
+  const kz = PHYSICS.k_z0 * (press/VEHICLE.placard_pressure_kpa);
+  const delta = fz / Math.max(kz,1);
+  return rf - PHYSICS.deflection_factor * delta;
+}
+function rollingResistanceCoeff(tread, press, t_c) {
+  const pt = Math.pow(VEHICLE.placard_pressure_kpa/Math.max(press,1), PHYSICS.p_exponent);
+  const s = PHYSICS.tread_rr_span;
+  const tt = (1-s)+s*(tread/VEHICLE.tread_new_mm);
+  const Tt = 1+PHYSICS.t_coeff*(t_c-VEHICLE.cold_reference_temperature_c);
+  return PHYSICS.c_rr0 * pt * tt * Tt;
+}
+function toeDrag(toe_sq) { return 2*PHYSICS.cornering_stiffness*Math.pow(Math.PI/180,2)*toe_sq; }
+
+// ---- Estimator (simplified JS port) ----
+function predict(x) {
+  const z = new Float64Array(11);
+  z[0]=x[4]; z[1]=x[5]; z[2]=x[6]; z[3]=x[7];
+  const r_fl=effectiveRollingRadius(x[0],x[4],cornerWeight('FL'));
+  const r_fr=effectiveRollingRadius(x[1],x[5],cornerWeight('FR'));
+  z[8]=r_fr/Math.max(r_fl,1e-6);
+  const r_rl=effectiveRollingRadius(x[2],x[6],cornerWeight('RL'));
+  const r_rr=effectiveRollingRadius(x[3],x[7],cornerWeight('RR'));
+  z[9]=r_rr/Math.max(r_rl,1e-6);
+  const crr=[rollingResistanceCoeff(x[0],x[4],30),rollingResistanceCoeff(x[1],x[5],30),rollingResistanceCoeff(x[2],x[6],30),rollingResistanceCoeff(x[3],x[7],30)];
+  z[10]=crr.reduce((a,b)=>a+b,0)/4;
+  return z;
+}
+function jacobian(x, eps=1e-5) {
+  const H=Array.from({length:11},()=>new Float64Array(10));
+  for(let j=0;j<10;j++){
+    const xp=x.slice(),xm=x.slice();
+    xp[j]+=eps;xm[j]-=eps;
+    const zp=predict(xp),zm=predict(xm);
+    for(let i=0;i<11;i++) H[i][j]=(zp[i]-zm[i])/(2*eps);
+  }
+  return H;
+}
+function runEstimator(z_obs) {
+  const mid=(VEHICLE.tread_new_mm+VEHICLE.tread_legal_mm)/2;
+  const x0=new Float64Array([mid,mid,mid,mid,240,240,240,240,0.1,0]);
+  const P0d=[6.25,6.25,6.25,6.25,1600,1600,1600,1600,0.16,1.0];
+  const R=[25,25,25,25,1e12,1e12,1e12,1e12,0.000025,0.000025,1e12];
+  const avail=new Set();
+  for(let i=0;i<11;i++) if(z_obs[i]!==0&&R[i]<1e11) avail.add(i);
+  const Rd=R.map((r,i)=>avail.has(i)?r:1e12);
+  const P0inv=P0d.map(d=>1/d);
+  let x=x0.slice();
+  let converged=false;
+  for(let iter=0;iter<6;iter++){
+    const H=jacobian(x);
+    const zp=predict(x);
+    const res=new Float64Array(11); for(let i=0;i<11;i++) res[i]=z_obs[i]-zp[i];
+    const A=Array.from({length:10},()=>new Float64Array(10));
+    const b=new Float64Array(10);
+    for(let i=0;i<11;i++){
+      const ri=1/Rd[i];
+      for(let j=0;j<10;j++){
+        b[j]+=H[i][j]*ri*res[i];
+        A[j][j]+=H[i][j]*ri*H[i][j];
+        for(let k=j+1;k<10;k++){
+          const v=H[i][j]*ri*H[i][k];
+          A[j][k]+=v;A[k][j]+=v;
+        }
+      }
+    }
+    for(let j=0;j<10;j++){b[j]+=P0inv[j]*(x0[j]-x[j]);A[j][j]+=P0inv[j];}
+    const dx=solve10(A,b);
+    if(!dx) break;
+    for(let j=0;j<10;j++) x[j]+=dx[j];
+    x[0]=Math.max(0.5,Math.min(9,x[0]));x[1]=Math.max(0.5,Math.min(9,x[1]));
+    x[2]=Math.max(0.5,Math.min(9,x[2]));x[3]=Math.max(0.5,Math.min(9,x[3]));
+    x[4]=Math.max(50,Math.min(500,x[4]));x[5]=Math.max(50,Math.min(500,x[5]));
+    x[6]=Math.max(50,Math.min(500,x[6]));x[7]=Math.max(50,Math.min(500,x[7]));
+    x[8]=Math.max(0,x[8]);
+    if(Math.max(...dx.map(Math.abs))<1e-7){converged=true;break;}
+  }
+  // Posterior covariance diagonal
+  const Hf=jacobian(x);
+  const Pf=P0d.slice();
+  for(let i=0;i<11;i++){
+    if(Rd[i]<1e11){
+      const ri=1/Rd[i];
+      for(let j=0;j<10;j++) Pf[j]=1/(P0inv[j]+Hf[i][j]*ri*Hf[i][j]);
+    }
+  }
+  // Observability classification
+  const states=STATE_NAMES.map((name,j)=>{
+    const colNorm=Math.sqrt(Hf.reduce((s,h)=>s+h[j]*h[j],0));
+    const vr=P0d[j]>0?Math.max(0,Math.min(1,1-Pf[j]/P0d[j])):0;
+    let obs='UNOBSERVABLE';
+    if(colNorm>1e-10&&vr>=0.01) obs='OBSERVED';
+    else if(colNorm>1e-10) obs='WEAK';
+    return {name, value:x[j], sigma:Math.sqrt(Math.max(0,Pf[j])), obs, vr, colNorm, prior_sigma:Math.sqrt(P0d[j])};
+  });
+  return {states, converged, nAvail:avail.size, iterationCount:converged?5:6};
+}
+function solve10(A,b){
+  const n=10;const m=A.map(r=>r.slice());const v=b.slice();
+  for(let i=0;i<n;i++){
+    let mx=i;for(let k=i+1;k<n;k++)if(Math.abs(m[k][i])>Math.abs(m[mx][i]))mx=k;
+    [m[i],m[mx]]=[m[mx],m[i]];[v[i],v[mx]]=[v[mx],v[i]];
+    if(Math.abs(m[i][i])<1e-20) return null;
+    for(let k=i+1;k<n;k++){const f=m[k][i]/m[i][i];for(let j=i;j<n;j++)m[k][j]-=f*m[i][j];v[k]-=f*v[i];}
+  }
+  const x=new Float64Array(n);
+  for(let i=n-1;i>=0;i--){x[i]=v[i];for(let j=i+1;j<n;j++)x[i]-=m[i][j]*x[j];x[i]/=m[i][i];}
+  return x;
+}
+
+// ---- Simulation ----
+function generateFrame(step) {
+  const sc = SCENARIOS[currentScenario];
+  const dt_h = 0.1; // 0.1 hours per step
+  const dist_km = step * 15.0 * 0.1 * 3.6; // speed*dt converted
+  const treads = sc.tread.map((t,i) => Math.max(0.5, t - sc.wear[i] * dist_km / 1000));
+  const presses = sc.press.slice();
+  const z_obs = new Float64Array(11);
+  // Pressure measurements
+  for(let i=0;i<4;i++) z_obs[i] = presses[i];
+  // Speed ratios
+  const r_fl = effectiveRollingRadius(treads[0],presses[0],cornerWeight('FL'));
+  const r_fr = effectiveRollingRadius(treads[1],presses[1],cornerWeight('FR'));
+  z_obs[8] = r_fr/Math.max(r_fl,1e-6);
+  const r_rl = effectiveRollingRadius(treads[2],presses[2],cornerWeight('RL'));
+  const r_rr = effectiveRollingRadius(treads[3],presses[3],cornerWeight('RR'));
+  z_obs[9] = r_rr/Math.max(r_rl,1e-6);
+  // Road load from Crr (NOT from estimator — from physics)
+  const crr = [rollingResistanceCoeff(treads[0],presses[0],30),rollingResistanceCoeff(treads[1],presses[1],30),rollingResistanceCoeff(treads[2],presses[2],30),rollingResistanceCoeff(treads[3],presses[3],30)];
+  z_obs[10] = crr.reduce((a,b)=>a+b,0)/4;
+  const result = runEstimator(z_obs);
+  return { step, treads, presses, toe: sc.toe, dist_km, result, z_obs };
+}
+
+function initReplay() {
+  replayData = [];
+  degradationHistory = [];
+  for(let i=0; i<=100; i++) {
+    const frame = generateFrame(i);
+    replayData.push(frame);
+    degradationHistory.push({dist: frame.dist_km, treads: frame.treads.slice()});
+  }
+  replayIndex = 0;
+  document.getElementById('replay-slider').max = replayData.length-1;
+  document.getElementById('replay-slider').value = 0;
+  updateDisplay(0);
+}
+
+function toggleReplay() {
+  replayPlaying = !replayPlaying;
+  document.getElementById('btn-play').innerHTML = replayPlaying ? '&#9646;&#9646; Pause' : '&#9654; Play';
+  if(replayPlaying) {
+    replayTimer = setInterval(()=>{
+      if(replayIndex >= replayData.length-1) { toggleReplay(); return; }
+      replayIndex++;
+      document.getElementById('replay-slider').value = replayIndex;
+      updateDisplay(replayIndex);
+    }, 200);
+  } else {
+    clearInterval(replayTimer);
+  }
+}
+function resetReplay() {
+  replayPlaying = false;
+  clearInterval(replayTimer);
+  document.getElementById('btn-play').innerHTML = '&#9654; Play';
+  replayIndex = 0;
+  document.getElementById('replay-slider').value = 0;
+  updateDisplay(0);
+}
+function seekReplay(val) {
+  replayIndex = parseInt(val);
+  updateDisplay(replayIndex);
+}
+
+function updateDisplay(idx) {
+  const frame = replayData[idx];
+  if(!frame) return;
+  document.getElementById('replay-distance').textContent = frame.dist_km.toFixed(1)+' km';
+  document.getElementById('replay-speed').textContent = '15.0 m/s';
+  // Update tyre cards
+  for(let i=0;i<4;i++){
+    const c = CORNERS[i];
+    const card = document.getElementById('tyre-'+c.toLowerCase());
+    const tread = frame.treads[i];
+    const press = frame.presses[i];
+    const obs = frame.result.states[i];
+    const treadColor = tread < 2 ? 'var(--red)' : tread < 3.5 ? 'var(--yellow)' : 'var(--green)';
+    card.innerHTML = `
+      <div class="corner-label">${CORNER_NAMES[c]}</div>
+      <div class="tread-val" style="color:${treadColor}">${tread.toFixed(2)} <span style="font-size:0.7rem;color:var(--text-dim)">mm</span></div>
+      <div style="font-size:0.75rem;color:var(--text-dim)">${press.toFixed(0)} kPa</div>
+      <div class="obs-badge obs-${obs.obs}">${obs.obs}</div>
+    `;
+    card.style.borderColor = obs.obs==='OBSERVED'?'var(--green)':obs.obs==='WEAK'?'var(--yellow)':'var(--red)';
+  }
+  // Update observability bars
+  const obsBars = document.getElementById('obs-bars');
+  const groups = [
+    {label:'Tread', indices:[0,1,2,3]},
+    {label:'Pressure', indices:[4,5,6,7]},
+    {label:'Toe²', indices:[8]},
+    {label:'Camber', indices:[9]},
+  ];
+  obsBars.innerHTML = groups.map(g => {
+    const maxVR = Math.max(...g.indices.map(i=>frame.result.states[i].vr));
+    const bestObs = g.indices.map(i=>frame.result.states[i].obs).includes('OBSERVED')?'OBSERVED':g.indices.map(i=>frame.result.states[i].obs).includes('WEAK')?'WEAK':'UNOBSERVABLE';
+    const color = OBS_COLORS[bestObs];
+    const width = Math.max(5, maxVR*100);
+    return `<div class="obs-bar-row">
+      <div class="obs-bar-label">${g.label}</div>
+      <div class="obs-bar-track"><div class="obs-bar-fill" style="width:${width}%;background:${color}"></div></div>
+      <div class="obs-bar-text" style="color:${color}">${bestObs}</div>
+    </div>`;
+  }).join('');
+  // Summary
+  const nObs = frame.result.states.filter(s=>s.obs==='OBSERVED').length;
+  document.getElementById('states-obs').textContent = nObs+'/10';
+  document.getElementById('n-meas').textContent = frame.result.nAvail+'/11';
+  document.getElementById('converged').textContent = frame.result.converged ? 'Yes' : 'No';
+  document.getElementById('converged').style.color = frame.result.converged ? 'var(--green)' : 'var(--red)';
+  document.getElementById('iterations').textContent = frame.result.iterationCount;
+  // Alerts
+  updateAlerts(frame);
+  // Ground truth table
+  updateGTTable(frame);
+  // Sensor list
+  updateSensors(frame);
+  // Detail panel if selected
+  if(selectedTyre) updateDetail(selectedTyre, frame);
+  // Degradation chart
+  drawDegradationChart();
+}
+
+function updateAlerts(frame) {
+  const alerts = [];
+  const treads = frame.treads;
+  const maxDiff = Math.max(...treads) - Math.min(...treads);
+  if(maxDiff > 1.0) {
+    alerts.push(`<div class="alert alert-danger">&#9888; Asymmetric wear detected: ${(maxDiff).toFixed(1)} mm spread across corners</div>`);
+  } else if(maxDiff > 0.5) {
+    alerts.push(`<div class="alert alert-warning">&#9888; Mild asymmetry: ${(maxDiff).toFixed(1)} mm spread</div>`);
+  }
+  const minPress = Math.min(...frame.presses);
+  if(minPress < 200) {
+    alerts.push(`<div class="alert alert-danger">&#128163; Low pressure detected: ${minPress.toFixed(0)} kPa</div>`);
+  }
+  if(!frame.result.converged) {
+    alerts.push(`<div class="alert alert-warning">&#9888; Estimator did not converge</div>`);
+  }
+  document.getElementById('alerts').innerHTML = alerts.join('');
+}
+
+function updateGTTable(frame) {
+  const tbody = document.getElementById('gt-tbody');
+  tbody.innerHTML = CORNERS.map((c,i) => {
+    const est = frame.result.states[i];
+    const err = frame.treads[i] - est.value;
+    return `<tr>
+      <td style="font-weight:600">${c}</td>
+      <td class="simulated">${frame.treads[i].toFixed(2)}</td>
+      <td>${est.value.toFixed(2)} ± ${est.sigma.toFixed(2)}</td>
+      <td class="simulated">${frame.presses[i].toFixed(0)}</td>
+      <td>${frame.result.states[4+i].value.toFixed(0)} ± ${frame.result.states[4+i].sigma.toFixed(1)}</td>
+      <td style="color:${Math.abs(err)<0.5?'var(--green)':Math.abs(err)<1?'var(--yellow)':'var(--red)'}">${err>0?'+':''}${err.toFixed(2)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function updateSensors(frame) {
+  const sensors = [
+    {name:'FL wheel speed', available:true},
+    {name:'FR wheel speed', available:true},
+    {name:'RL wheel speed', available:true},
+    {name:'RR wheel speed', available:true},
+    {name:'TPMS pressure', available:true},
+    {name:'Tyre temperature', available:true},
+    {name:'Acceleration', available:true},
+    {name:'Motor torque', available:!(SCENARIOS[currentScenario].missing||[]).includes('motor_torque')},
+  ];
+  document.getElementById('sensor-list').innerHTML = sensors.map(s =>
+    `<div class="sensor-item"><span class="sensor-icon ${s.available?'available':'unavailable'}">${s.available?'&#10003;':'&#10007;'}</span>${s.name}</div>`
+  ).join('');
+}
+
+// ---- Detail Panel ----
+function selectTyre(corner) {
+  selectedTyre = corner;
+  document.querySelectorAll('.tyre-card').forEach(c=>c.classList.remove('selected'));
+  document.getElementById('tyre-'+corner.toLowerCase()).classList.add('selected');
+  const panel = document.getElementById('detail-panel');
+  panel.classList.add('visible');
+  updateDetail(corner, replayData[replayIndex]);
+}
+function closeDetail() {
+  selectedTyre = null;
+  document.getElementById('detail-panel').classList.remove('visible');
+  document.querySelectorAll('.tyre-card').forEach(c=>c.classList.remove('selected'));
+}
+function updateDetail(corner, frame) {
+  const idx = CORNERS.indexOf(corner);
+  const est = frame.result.states;
+  document.getElementById('detail-title').textContent = `${CORNER_NAMES[corner]} (${corner})`;
+  document.getElementById('detail-grid').innerHTML = `
+    <div class="detail-stat"><div class="label">Tread</div><div class="value">${est[idx].value.toFixed(2)} ± ${est[idx].sigma.toFixed(2)} mm</div><div class="obs-badge obs-${est[idx].obs}">${est[idx].obs}</div></div>
+    <div class="detail-stat"><div class="label">Pressure</div><div class="value">${est[4+idx].value.toFixed(0)} ± ${est[4+idx].sigma.toFixed(1)} kPa</div><div class="obs-badge obs-${est[4+idx].obs}">${est[4+idx].obs}</div></div>
+    <div class="detail-stat"><div class="label">Ground Truth Tread</div><div class="value simulated">${frame.treads[idx].toFixed(2)} mm</div><div style="font-size:0.7rem;color:var(--yellow)">SIMULATION ONLY</div></div>
+    <div class="detail-stat"><div class="label">Ground Truth Pressure</div><div class="value simulated">${frame.presses[idx].toFixed(0)} kPa</div></div>
+  `;
+  document.getElementById('detail-chain').innerHTML = `
+    <div style="font-size:0.8rem;font-weight:600;color:var(--accent);margin-bottom:0.5rem;">Information Chain</div>
+    <div class="chain-step"><span class="arrow">&#8594;</span> Wheel-speed ratio</div>
+    <div class="chain-step"><span class="arrow">&#8594;</span> Effective rolling radius</div>
+    <div class="chain-step"><span class="arrow">&#8594;</span> Tread-sensitive physics</div>
+    <div class="chain-step"><span class="arrow">&#8594;</span> State estimate (${est[idx].obs})</div>
+    <div class="chain-step" style="margin-top:0.5rem;color:var(--text-dim);font-size:0.75rem;">Toe: ${(Math.sqrt(Math.max(0,est[8].value))).toFixed(3)}° (drag = 2·Cα·toe²) — ${est[8].obs}</div>
+  `;
+}
+
+// ---- Degradation Chart (canvas) ----
+function drawDegradationChart() {
+  const canvas = document.getElementById('degradation-chart');
+  const ctx = canvas.getContext('2d');
+  canvas.width = canvas.offsetWidth * 2;
+  canvas.height = 500;
+  ctx.scale(2,2);
+  const W = canvas.offsetWidth, H = 250;
+  ctx.clearRect(0,0,W,H);
+  if(degradationHistory.length < 2) return;
+  const maxDist = degradationHistory[degradationHistory.length-1].dist;
+  const allTreads = degradationHistory.flatMap(d=>d.treads);
+  const minT = Math.min(...allTreads) - 0.5;
+  const maxT = Math.max(...allTreads) + 0.5;
+  const pad = {l:50,r:20,t:20,b:30};
+  const pw=W-pad.l-pad.r, ph=H-pad.t-pad.b;
+  // Grid
+  ctx.strokeStyle='#1e293b'; ctx.lineWidth=0.5;
+  for(let i=0;i<=4;i++){
+    const y=pad.t+ph*i/4;
+    ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();
+    ctx.fillStyle='#94a3b8';ctx.font='10px sans-serif';ctx.textAlign='right';
+    ctx.fillText((maxT-(maxT-minT)*i/4).toFixed(1),pad.l-5,y+4);
+  }
+  // Lines per corner
+  const colors = ['#06b6d4','#3b82f6','#a855f7','#f97316'];
+  CORNERS.forEach((c,ci)=>{
+    ctx.strokeStyle=colors[ci];ctx.lineWidth=2;ctx.beginPath();
+    degradationHistory.forEach((d,di)=>{
+      const x=pad.l+(d.dist/maxDist)*pw;
+      const y=pad.t+((maxT-d.treads[ci])/(maxT-minT))*ph;
+      di===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+    // Label at end
+    const last=degradationHistory[degradationHistory.length-1];
+    const lx=pad.l+pw;
+    const ly=pad.t+((maxT-last.treads[ci])/(maxT-minT))*ph;
+    ctx.fillStyle=colors[ci];ctx.font='bold 10px sans-serif';ctx.textAlign='left';
+    ctx.fillText(c,lx+4,ly+4);
+  });
+  // Legal limit line
+  const legalY=pad.t+((maxT-VEHICLE.tread_legal_mm)/(maxT-minT))*ph;
+  ctx.strokeStyle='rgba(239,68,68,0.5)';ctx.lineWidth=1;ctx.setLineDash([5,3]);
+  ctx.beginPath();ctx.moveTo(pad.l,legalY);ctx.lineTo(W-pad.r,legalY);ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle='#ef4444';ctx.font='9px sans-serif';ctx.textAlign='right';
+  ctx.fillText('Legal limit',W-pad.r,legalY-5);
+  // X-axis
+  ctx.fillStyle='#94a3b8';ctx.font='10px sans-serif';ctx.textAlign='center';
+  for(let i=0;i<=5;i++){
+    const x=pad.l+pw*i/5;
+    ctx.fillText((maxDist*i/5).toFixed(0)+' km',x,H-5);
+  }
+  // Current replay position
+  if(replayData[replayIndex]){
+    const cx=pad.l+(replayData[replayIndex].dist_km/maxDist)*pw;
+    ctx.strokeStyle='rgba(255,255,255,0.5)';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(cx,pad.t);ctx.lineTo(cx,pad.t+ph);ctx.stroke();
+  }
+}
+
+// ---- Scenario buttons ----
+function initScenarioButtons() {
+  const container = document.getElementById('scenario-buttons');
+  container.innerHTML = Object.entries(SCENARIOS).map(([key,sc]) =>
+    `<button class="scenario-btn ${key===currentScenario?'active':''}" onclick="selectScenario('${key}')">${sc.name}</button>`
+  ).join('');
+}
+function selectScenario(key) {
+  currentScenario = key;
+  replayPlaying = false;
+  clearInterval(replayTimer);
+  document.getElementById('btn-play').innerHTML = '&#9654; Play';
+  initScenarioButtons();
+  initReplay();
+}
+
+// ---- Init ----
+window.addEventListener('load', ()=>{
+  initScenarioButtons();
+  initReplay();
+});
+window.addEventListener('resize', drawDegradationChart);
+</script>
+</body>
+</html>
