@@ -116,10 +116,20 @@ def measure_ext(state: TyreState, rng: np.random.Generator, v_ms=22.0,
 
 
 def estimate_ext(z: np.ndarray, T_meas=Vehicle.T_ref, iters=6, v_ms=22.0,
-                 accel_ms2=0.0, grade_rad=0.0, noise=ExtraNoise):
-    """Iterated EKF over up to 18 channels; NaN channels are ignored."""
+                 accel_ms2=0.0, grade_rad=0.0, noise=ExtraNoise, extra_variance=None):
+    """Iterated EKF over up to 18 channels; NaN channels are ignored.
+
+    ``extra_variance`` (length 18) is added to the diagonal of R to represent
+    model uncertainty the sensor-noise terms do not cover.
+    """
     x0, P0 = prior()
     R = extended_covariance(z, noise)
+    if extra_variance is not None:
+        extra = np.asarray(extra_variance)
+        if extra.ndim == 1:
+            R[np.diag_indices(N_EXT)] += extra
+        else:
+            R += extra
     nan_mask = np.isnan(z)
     idx = np.flatnonzero(nan_mask)
     R[idx, :] = 0.0

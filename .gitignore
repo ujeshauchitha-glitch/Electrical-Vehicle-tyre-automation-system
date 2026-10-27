@@ -36,3 +36,6 @@ desktop.ini
 
 # vendored CDN assets for the offline build (regenerate: python scripts/build_offline.py)
 frontend/vendor/
+
+# unpublished IP notes
+private/
