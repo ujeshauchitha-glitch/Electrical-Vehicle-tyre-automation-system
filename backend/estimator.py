@@ -28,6 +28,7 @@ from .physics import (
     CORNERS,
     Vehicle,
     DrivetrainConfig,
+    aero_drag_force,
     effective_rolling_radius,
     first_mode_frequency,
     motor_torque_measurement,
@@ -187,6 +188,50 @@ def measure(
 # Predict (forward model) and Jacobian
 # ---------------------------------------------------------------------------
 
+_FZ = np.array([Vehicle.Fz(c) for c in CORNERS])
+_DRIVETRAIN = DrivetrainConfig()
+
+
+def predict_batch(
+    X: np.ndarray,
+    T_meas: float = Vehicle.T_ref,
+    v_ms: float = 22.0,
+    accel_ms2: float = 0.0,
+    grade_rad: float = 0.0,
+) -> np.ndarray:
+    """Forward measurement model for many states at once: (n, 10) -> (n, 12)."""
+    X = np.atleast_2d(X)
+    tread = X[:, IDX_TREAD]
+    press = X[:, IDX_PRESS]
+    toe_sq = X[:, IDX_TOESQ]
+    z = np.empty((X.shape[0], N_MEAS))
+
+    z[:, M_PRESS] = press
+    z[:, M_FREQ] = first_mode_frequency(tread, press)
+
+    radius = effective_rolling_radius(tread, press, _FZ)
+    z[:, 8] = radius[:, 1] / radius[:, 0]
+    z[:, 9] = radius[:, 3] / radius[:, 2]
+
+    d = _DRIVETRAIN
+    mg = Vehicle.mass * Vehicle.g
+    toe_force = toe_drag_from_sq(toe_sq)
+    z[:, M_ROADLOAD] = (
+        rolling_resistance_coeff(tread, press, T_meas).mean(axis=1) + toe_force / mg
+    )
+
+    F_rr = (rolling_resistance_coeff(tread, press, Vehicle.T_ref) * _FZ).sum(axis=1)
+    F_traction = (
+        aero_drag_force(v_ms, d.CdA, d.rho_air)
+        + F_rr
+        + d.mass * d.g * np.sin(grade_rad)
+        + d.mass * accel_ms2
+        + toe_drag_from_sq(np.maximum(0.0, toe_sq))
+    )
+    z[:, M_MOTORTORQUE] = F_traction * d.rolling_radius / (d.gear_ratio * d.efficiency)
+    return z
+
+
 def predict(
     x: np.ndarray,
     T_meas: float = Vehicle.T_ref,
@@ -203,28 +248,7 @@ def predict(
     [10]   road-load Crr-equivalent
     [11]   expected motor torque (N.m)
     """
-    tread = {c: x[i] for i, c in enumerate(CORNERS)}
-    press = {c: x[4 + i] for i, c in enumerate(CORNERS)}
-    z = np.zeros(N_MEAS)  # 12 elements
-
-    z[M_PRESS] = [press[c] for c in CORNERS]
-
-    for i, c in enumerate(CORNERS):
-        z[4 + i] = first_mode_frequency(tread[c], press[c])
-
-    for k, (a, b) in enumerate((("FL", "FR"), ("RL", "RR"))):
-        ra = effective_rolling_radius(tread[a], press[a], Vehicle.Fz(a))
-        rb = effective_rolling_radius(tread[b], press[b], Vehicle.Fz(b))
-        z[8 + k] = rb / ra
-
-    C_rr = np.mean([rolling_resistance_coeff(tread[c], press[c], T_meas) for c in CORNERS])
-    F_toe = toe_drag_from_sq(x[IDX_TOESQ])
-    z[M_ROADLOAD] = C_rr + F_toe / (Vehicle.mass * Vehicle.g)
-
-    # Phase 4: Expected motor torque from tyre state
-    z[M_MOTORTORQUE] = motor_torque_measurement(x, v_ms, accel_ms2, grade_rad)
-
-    return z
+    return predict_batch(x, T_meas, v_ms, accel_ms2, grade_rad)[0]
 
 
 def jacobian(
@@ -236,15 +260,10 @@ def jacobian(
     eps: float = 1e-5,
 ) -> np.ndarray:
     """Numerical Jacobian of the forward model: d(measurements)/d(state)."""
-    H = np.zeros((N_MEAS, N_STATE))  # (12, 10)
-    for j in range(N_STATE):
-        dx = np.zeros(N_STATE)
-        dx[j] = eps
-        H[:, j] = (
-            predict(x + dx, T_meas, v_ms, accel_ms2, grade_rad)
-            - predict(x - dx, T_meas, v_ms, accel_ms2, grade_rad)
-        ) / (2 * eps)
-    return H
+    steps = eps * np.eye(N_STATE)
+    zp = predict_batch(x + steps, T_meas, v_ms, accel_ms2, grade_rad)
+    zm = predict_batch(x - steps, T_meas, v_ms, accel_ms2, grade_rad)
+    return ((zp - zm) / (2 * eps)).T
 
 
 # ---------------------------------------------------------------------------
