@@ -80,7 +80,7 @@ DEFAULT_PHYSICS = PhysicsConfig(
     tread_rr_span=0.20,
     c_rr0=0.0090,
     p_exponent=0.45,
-    t_coeff=0.0015,
+    t_coeff=-0.008,  # ASSUMED: Crr falls as tyre warms (legacy +0.0015 had the wrong sign)
     deflection_factor=1.0 / 3.0,  # UNVALIDATED — legacy value
 )
 

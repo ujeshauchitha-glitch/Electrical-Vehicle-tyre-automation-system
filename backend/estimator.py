@@ -173,7 +173,10 @@ def measure(
             state.toe ** 2,  # toe^2
             state.camber,
         ])
-        T_true = motor_torque_measurement(state_arr, v_ms, accel_ms2, grade_rad)
+        T_true = motor_torque_measurement(
+            state_arr, v_ms, accel_ms2, grade_rad,
+            temp_c=[state.temp[c] for c in CORNERS],
+        )
         z[M_MOTORTORQUE] = T_true + rng.normal(0, noise.motortorque_sigma)
     else:
         z[M_MOTORTORQUE] = np.nan
@@ -220,7 +223,7 @@ def predict_batch(
         rolling_resistance_coeff(tread, press, T_meas).mean(axis=1) + toe_force / mg
     )
 
-    F_rr = (rolling_resistance_coeff(tread, press, Vehicle.T_ref) * _FZ).sum(axis=1)
+    F_rr = np.cos(grade_rad) * (rolling_resistance_coeff(tread, press, T_meas) * _FZ).sum(axis=1)
     F_traction = (
         aero_drag_force(v_ms, d.CdA, d.rho_air)
         + F_rr
@@ -228,7 +231,7 @@ def predict_batch(
         + d.mass * accel_ms2
         + toe_drag_from_sq(np.maximum(0.0, toe_sq))
     )
-    z[:, M_MOTORTORQUE] = F_traction * d.rolling_radius / (d.gear_ratio * d.efficiency)
+    z[:, M_MOTORTORQUE] = F_traction * radius[:, 2:].mean(axis=1) / (d.gear_ratio * d.efficiency)
     return z
 
 

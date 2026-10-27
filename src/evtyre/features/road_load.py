@@ -123,7 +123,7 @@ def extract(
     # C_rr0 and exponents are UNVALIDATED guesses from legacy.
     _C_RR0 = 0.0090       # UNVALIDATED — legacy reference value
     _P_EXPONENT = 0.45    # UNVALIDATED — legacy reference value
-    _T_COEFF = 0.0015     # UNVALIDATED — legacy reference value
+    _T_COEFF = -0.008     # ASSUMED — Crr falls as the tyre warms; legacy +0.0015 had the wrong sign
     _T_REF = 25.0         # UNVALIDATED — reference temperature (°C)
 
     # NOTE ON THE OMITTED TREAD TERM.

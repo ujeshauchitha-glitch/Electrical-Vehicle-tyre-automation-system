@@ -35,6 +35,7 @@ from backend.physics import (
     DrivetrainConfig,
     Vehicle,
     aero_drag_force,
+    effective_rolling_radius,
     motor_torque_measurement,
     rolling_resistance_coeff,
     toe_drag_from_sq,
@@ -216,14 +217,17 @@ class TestCircularity:
         # Motor torque difference is driven by F_rr difference, NOT by
         # the old road_load coefficient model
         delta_T = T_b - T_a
-        delta_Frr = sum(
-            (rolling_resistance_coeff(5.0, 280.0, 25.0) - rolling_resistance_coeff(5.0, 200.0, 25.0))
-            * Vehicle.Fz(c)
-            for c in CORNERS
-        )
-        expected_delta_T = delta_Frr * Vehicle.r_belt / (Vehicle.gear_ratio * Vehicle.drivetrain_eff)
-        assert np.isclose(delta_T, expected_delta_T, rtol=0.01), \
-            "Motor torque difference must match physical F_rr difference, not old Crr model"
+
+        def expected_torque(p_kpa):
+            f_rr = sum(
+                rolling_resistance_coeff(5.0, p_kpa, 25.0) * Vehicle.Fz(c) for c in CORNERS
+            )
+            r_driven = effective_rolling_radius(5.0, p_kpa, Vehicle.Fz("RL"))
+            f_total = F_aero + f_rr + toe_drag_from_sq(0.25)
+            return f_total * r_driven / (Vehicle.gear_ratio * Vehicle.drivetrain_eff)
+
+        expected_delta_T = expected_torque(280.0) - expected_torque(200.0)
+        assert np.isclose(delta_T, expected_delta_T, rtol=0.01),             "Motor torque difference must match physical F_rr difference, not old Crr model"
 
     def test_information_flow_independence(self):
         """Verify the information flow is:

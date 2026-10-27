@@ -39,7 +39,8 @@ class Vehicle:
     C_rr0         = 0.0090        # baseline rolling resistance coeff
     p_exponent    = 0.45          # pressure exponent
     tread_rr_span = 0.20          # fractional span of tread effect
-    T_coeff       = 0.0015        # per deg C
+    T_coeff       = -0.008        # per deg C; ASSUMED. Crr falls as the tyre warms
+                                  # (EU test correction 0.008; spread 0.005-0.014)
     T_ref         = 25.0          # reference temperature, deg C
 
     CdA           = 0.65          # drag area, m^2
@@ -104,13 +105,17 @@ def rolling_resistance_coeff(tread_mm: float, p_kPa: float, T_C: float) -> float
 
 
 def toe_drag_force(toe_deg: float) -> float:
-    """Aero-equivalent drag force from toe (N)."""
+    """Drag force from per-wheel toe angle of one axle (N): 2 C_alpha alpha^2."""
     toe_rad = np.deg2rad(toe_deg)
     return 2.0 * Vehicle.C_alpha * toe_rad ** 2
 
 
 def toe_drag_from_sq(toe_sq_deg2: float) -> float:
-    """Toe drag from toe-squared (avoids sqrt in linearised estimator)."""
+    """Toe drag from toe-squared (avoids sqrt in linearised estimator).
+
+    Toe is the per-wheel toe angle of the misaligned axle (both wheels equal,
+    so total axle toe is twice this): drag = 2 C_alpha alpha^2.
+    """
     return 2.0 * Vehicle.C_alpha * (np.pi / 180.0) ** 2 * toe_sq_deg2
 
 
@@ -178,6 +183,7 @@ def motor_torque_measurement(
     accel_ms2: float = 0.0,
     grade_rad: float = 0.0,
     drivetrain: DrivetrainConfig | None = None,
+    temp_c=Vehicle.T_ref,
 ) -> float:
     """Compute expected motor torque from tyre state and vehicle dynamics.
 
@@ -210,6 +216,12 @@ def motor_torque_measurement(
         Road grade in radians. 0 if unknown.
     drivetrain : DrivetrainConfig, optional
         Drivetrain parameters. Uses defaults if None.
+    temp_c : float or length-4 sequence
+        Tyre temperature(s) in CORNERS order for the rolling-resistance term.
+
+    The tractive force is converted to torque with the effective rolling
+    radius of the rear (driven, ASSUMED RWD) tyres, not the nominal belt
+    radius, so tread and pressure enter the conversion.
 
     Returns
     -------
@@ -221,14 +233,14 @@ def motor_torque_measurement(
 
     tread = {c: float(state[i]) for i, c in enumerate(CORNERS)}
     press = {c: float(state[4 + i]) for i, c in enumerate(CORNERS)}
-    temp  = {c: 25.0 for c in CORNERS}  # use reference temp for predict
+    temp  = dict(zip(CORNERS, np.broadcast_to(np.asarray(temp_c, dtype=float), (4,))))
     toe_sq = float(max(0.0, state[8]))  # toe^2 at index 8
 
     # Aerodynamic drag (independent of tyre state)
     F_aero = aero_drag_force(v_ms, drivetrain.CdA, drivetrain.rho_air)
 
     # Rolling resistance (depends on tyre state -- this is what we want to observe)
-    F_rr = sum(
+    F_rr = np.cos(grade_rad) * sum(
         rolling_resistance_coeff(tread[c], press[c], temp[c])
         * Vehicle.Fz(c)
         for c in CORNERS
@@ -247,7 +259,11 @@ def motor_torque_measurement(
     F_traction = F_aero + F_rr + F_grade + F_inertia + F_toe
 
     # Motor torque through drivetrain
-    T_motor = F_traction * drivetrain.rolling_radius / (
+    r_driven = float(np.mean([
+        effective_rolling_radius(tread[c], press[c], Vehicle.Fz(c))
+        for c in ("RL", "RR")
+    ]))
+    T_motor = F_traction * r_driven / (
         drivetrain.gear_ratio * drivetrain.efficiency
     )
 

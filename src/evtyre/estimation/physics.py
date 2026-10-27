@@ -54,7 +54,7 @@ class PhysicsConfig:
 
     t_coeff: float
     """Temperature coefficient for C_rr (1/C).
-    UNVALIDATED guess.  Legacy value: 0.0015."""
+    ASSUMED -0.008 (Crr falls as the tyre warms; published range -0.005 to -0.014).  The legacy value +0.0015 had the wrong sign."""
 
     deflection_factor: float
     """Fraction of vertical deflection that reduces effective rolling radius
