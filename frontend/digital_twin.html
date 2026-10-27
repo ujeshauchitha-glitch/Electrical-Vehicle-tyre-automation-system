@@ -345,7 +345,7 @@ const OBS_COLORS = {OBSERVED:'#C7FFD8',WEAK:'#FFD998',UNOBSERVABLE:'#FF9898'};
 const OBS_BG = {OBSERVED:'rgba(199,255,216,0.12)',WEAK:'rgba(255,217,152,0.12)',UNOBSERVABLE:'rgba(255,152,152,0.12)'};
 const OBS_BORDER = {OBSERVED:'rgba(199,255,216,0.3)',WEAK:'rgba(255,217,152,0.3)',UNOBSERVABLE:'rgba(255,152,152,0.3)'};
 
-const PHYSICS = {k_z0:210000,cornering_stiffness:55000,tread_rr_span:0.20,c_rr0:0.0090,p_exponent:0.45,t_coeff:0.0015,deflection_factor:1/3};
+const PHYSICS = {k_z0:210000,cornering_stiffness:55000,tread_rr_span:0.20,c_rr0:0.0090,p_exponent:0.45,t_coeff:-0.008,deflection_factor:1/3};
 const VEHICLE = {mass_kg:1800,front_weight_fraction:0.48,wheel_belt_radius_m:0.322,tread_new_mm:8.0,tread_legal_mm:1.6,placard_pressure_kpa:240,cold_reference_temperature_c:25.0};
 const G = 9.80665;
 const STATE_NAMES = ['tread_FL','tread_FR','tread_RL','tread_RR','press_FL','press_FR','press_RL','press_RR','toe^2','camber'];
@@ -455,12 +455,36 @@ function runEstimator(z_obs){
     x[8]=Math.max(0,x[8]);
     if(Math.max(...dx.map(Math.abs))<1e-7){converged=true;break;}
   }
-  const Hf=jacobian(x);const Pf=P0d.slice();
-  for(let i=0;i<11;i++){if(Rd[i]<1e11){const ri=1/Rd[i];for(let j=0;j<10;j++)Pf[j]=1/(P0inv[j]+Hf[i][j]*ri*Hf[i][j]);}}
+  const Hf=jacobian(x);
+  // Build full information matrix and invert for posterior covariance
+  const Ainf=Array.from({length:10},(_,j)=>{const row=new Float64Array(10);row[j]=P0inv[j];return row;});
+  for(let i=0;i<11;i++){if(Rd[i]<1e11){const ri=1/Rd[i];for(let j=0;j<10;j++)for(let k=0;k<10;k++)Ainf[j][k]+=Hf[i][j]*ri*Hf[i][k];}}
+  const Pfull=solve10(Ainf,Array.from({length:10},()=>1)); // approximate inverse via identity solve
+  const Pf=P0d.slice();
+  if(Pfull)for(let j=0;j<10;j++)Pf[j]=Math.max(0,Pfull[j]);
+  // Common-mode check: tread FL/FR share axle, RL/RR share axle
+  const cmReduced=[false,false];
+  if(Pfull){
+    const pairs=[[0,1],[2,3]]; // FL-FR, RL-RR
+    for(let p=0;p<2;p++){
+      const i=pairs[p][0],j=pairs[p][1];
+      // Common-mode variance: var((x_i+x_j)/sqrt(2)) = (Pii+Pjj+2*Pij)/2
+      const priorCm=P0d[i];
+      const postCm=(Pf[i]+Pf[j]+2*(Pfull[i*10+j]||0))/2;
+      const cmVr=priorCm>0?Math.max(0,1-postCm/priorCm):0;
+      cmReduced[p]=cmVr<0.01;
+    }
+  }
   const states=STATE_NAMES.map((name,j)=>{
     const colNorm=Math.sqrt(Hf.reduce((s,h)=>s+h[j]*h[j],0));
     const vr=P0d[j]>0?Math.max(0,Math.min(1,1-Pf[j]/P0d[j])):0;
-    let obs='UNOBSERVABLE';if(colNorm>1e-10&&vr>=0.01)obs='OBSERVED';else if(colNorm>1e-10)obs='WEAK';
+    let obs='UNOBSERVABLE';
+    if(colNorm>1e-10&&vr>=0.01){
+      // Check common-mode for tread states
+      if((j===0||j===1)&&cmReduced[0])obs='WEAK';
+      else if((j===2||j===3)&&cmReduced[1])obs='WEAK';
+      else obs='OBSERVED';
+    }else if(colNorm>1e-10)obs='WEAK';
     return{name,value:x[j],sigma:Math.sqrt(Math.max(0,Pf[j])),obs,vr,colNorm,prior_sigma:Math.sqrt(P0d[j])};
   });
   return{states,converged,nAvail:avail.size,iterationCount:converged?5:6};

@@ -91,12 +91,17 @@ _frontend_dir = Path(__file__).resolve().parent.parent / "frontend"
 
 @app.get("/", response_class=FileResponse)
 def serve_dashboard():
-    """Serve the digital twin dashboard."""
-    return _frontend_dir / "digital_twin.html"
+    """Serve the 3D digital twin dashboard."""
+    return _frontend_dir / "tyre3d.html"
 
 @app.get("/dashboard", response_class=FileResponse)
 def serve_dashboard_alias():
     """Alias for the dashboard."""
+    return _frontend_dir / "tyre3d.html"
+
+@app.get("/classic", response_class=FileResponse)
+def serve_classic():
+    """Serve the classic dashboard."""
     return _frontend_dir / "digital_twin.html"
 
 
