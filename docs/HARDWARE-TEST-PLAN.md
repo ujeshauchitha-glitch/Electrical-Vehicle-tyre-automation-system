@@ -94,3 +94,43 @@ matches measured mm/km. Start early; it is the longest task.
   may differ in ways that break observability.
 - Tread information may be weaker than the model assumes (2 % radius change).
 - Vehicle CAN access and DBC availability.
+
+## Tread and camber without the resonance channel (`backend/extended.py`)
+
+Optional channels, all constants assumed. Simulation, 300 seeded states,
+`scripts/ablation_ext.py`:
+
+| Case | Tread RMSE (mm) | Camber RMSE (deg) | Camber sigma claimed (deg) |
+|---|---|---|---|
+| Base, no resonance | 1.70 | 0.61 (= prior) | 1.00 |
+| + GNSS radius, no resonance | 0.93 | 0.64 | 1.00 |
+| + ESC | 0.12 | 0.11 | 0.11 |
+| ESC with 0.05 m/s^2 accel bias | 0.12 | 0.28 | 0.11 |
+| ESC with 0.15 m/s^2 accel bias | 0.12 | 0.77 | 0.11 |
+| GNSS no res, slip +0.3 % | 1.25 (bias 0.87) | | |
+| GNSS no res, slip +1.0 % | 2.52 (bias 2.35) | | |
+
+Findings:
+
+- Camber becomes observable only if the single-scalar, same-direction camber
+  model is right. Mirrored left/right camber is invisible by construction.
+- An unmodelled lateral-accelerometer bias converts one-to-one into camber
+  error (0.17 m/s^2 per degree), and the filter's sigma does not warn. At
+  0.15 m/s^2 the result is worse than the prior. Road crown, bank and wind
+  act the same way.
+- GNSS-radius cuts no-resonance tread error from 1.7 to 0.9 mm in the ideal
+  case but is not safety-grade, and 1 % slip makes it worse than not using it.
+  It needs coasting or low-torque data, a correct nominal radius, and
+  tyre-size tolerance known.
+
+Hardware experiments this adds:
+
+1. Lateral-accelerometer and steering-angle zero offsets: log at rest on a
+   levelled surface, and straight-line runs in both directions on the same
+   road. Fit a bias state or calibrate it out before using channels 12-13.
+2. Known camber change on an alignment rack (e.g. +/-1 deg, both same-direction
+   and mirrored) with straight-line runs: does the steering offset and lateral
+   acceleration match the assumed `C_gamma = 0.08 C_alpha`? Fit `C_gamma`.
+3. GNSS-radius: RTK or dual-frequency GNSS speed, coasting segments at several
+   speeds, and measured tyre radius (rolling circumference test) to check the
+   nominal radius and the slip bias on driven vs undriven axles.
