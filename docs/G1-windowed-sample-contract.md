@@ -187,3 +187,25 @@ The resonance feature extractor is implemented as a stub that raises
 `NotImplementedError` with "G1" in the message.  This is intentional:
 a stub that returns a value invites someone to fill it in without
 reopening G1.  See `src/evtyre/features/resonance.py`.
+
+---
+
+## Implementation status (27 Oct 2026)
+
+The software contract is now implemented, **without** answering the physics
+question:
+
+- `src/evtyre/signal/windowed.py` — `WindowedSample`; sample rate and
+  anti-alias cutoff are caller-supplied (placed outside the frozen Phase 1
+  `schema/` package).
+- `src/evtyre/features/resonance_windowed.py` — spectral peak extractor. The
+  search band is a required argument, so the first-mode vs second-mode choice
+  stays with the caller. Classification C. Returns UNAVAILABLE for >20 %
+  missing samples, mid-window gaps, bands above Nyquist and low SNR.
+- `src/evtyre/simulation/wheel_speed_synth.py` — synthetic windows with known
+  resonance, for tests only. It encodes no claim about real encoder behaviour.
+- The frame-based `resonance.extract` still raises, unchanged.
+
+Still open: which mode carries the tread signal, the real anti-alias design,
+the CAN/ADC path, and frame/window synchronisation. All need hardware; see
+`HARDWARE-TEST-PLAN.md`. The estimator does not consume the new feature yet.
