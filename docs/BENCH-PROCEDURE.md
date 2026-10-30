@@ -52,6 +52,12 @@ Run E, GNSS radius
 - Pressure MAE <= 10 kPa versus the reference gauge.
 - Claimed 1-sigma contains the error about 68 % of the time (NEES near 1).
 - No state labelled observable that the Jacobian shows is not.
+- Fitted resonance tread slope >= about 0.7 x the assumed 1.15 Hz/mm. In
+  `scripts/truth_study.py` (simulation, assumed physics) the calibrated
+  estimator beat its own no-resonance variant only when the true slope was
+  above roughly 0.7 x the assumed one; below that, trusting the resonance made
+  tread worse. If the fitted slope is lower, drop the resonance from the tread
+  estimate or estimate the slope per vehicle.
 
 ## Log format
 See `data/log_template.csv` (decoded channels, native units). Raw pulse
